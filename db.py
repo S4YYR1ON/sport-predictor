@@ -1,30 +1,41 @@
-import sqlite3
-from pathlib import Path
-DB=Path(__file__).with_name("predictions.sqlite3")
-def connect():
-    c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
+import streamlit as st
+from st_supabase_connection import SupabaseConnection
+
+# Подключение к Supabase
+conn = st.connection("supabase", type=SupabaseConnection)
+
 def init_db():
-    with connect() as c:
-        c.execute("""CREATE TABLE IF NOT EXISTS predictions(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,sport TEXT,event TEXT,selection TEXT,
-        probability REAL,odds REAL,explanation TEXT,confidence TEXT,
-        status TEXT DEFAULT 'open',profit REAL,created_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
-def save_prediction(sport,event,selection,probability,odds,explanation,confidence):
-    with connect() as c:
-        cur=c.execute("INSERT INTO predictions(sport,event,selection,probability,odds,explanation,confidence) VALUES(?,?,?,?,?,?,?)",
-        (sport,event,selection,probability,odds,explanation,confidence))
-        return cur.lastrowid
+    # Таблица уже создана вручную в Supabase, поэтому здесь ничего не делаем
+    pass
+
+def save_prediction(sport, event, selection, probability, odds, explanation, confidence):
+    data = {
+        "sport": sport, "event": event, "selection": selection,
+        "probability": probability, "odds": odds,
+        "explanation": explanation, "confidence": confidence
+    }
+    result = conn.table("predictions").insert(data).execute()
+    return result.data[0]["id"] if result.data else None
+
 def list_predictions(limit=100):
-    with connect() as c:
-        return [dict(r) for r in c.execute("SELECT * FROM predictions ORDER BY id DESC LIMIT ?",(limit,)).fetchall()]
-def settle_prediction(pid,result):
-    with connect() as c:
-        r=c.execute("SELECT * FROM predictions WHERE id=? AND status='open'",(pid,)).fetchone()
-        if not r: return False
-        profit=(r["odds"]-1) if result=="won" and r["odds"] else (-1 if result=="lost" else 0)
-        c.execute("UPDATE predictions SET status=?,profit=? WHERE id=?",(result,profit,pid))
-        return True
+    result = conn.table("predictions").select("*").order("id", desc=True).limit(limit).execute()
+    return result.data
+
+def settle_prediction(pid, result_status):
+    pred = conn.table("predictions").select("*").eq("id", pid).eq("status", "open").execute()
+    if not pred.data:
+        return False
+    row = pred.data[0]
+    profit = (row["odds"] - 1) if result_status == "won" and row["odds"] else (-1 if result_status == "lost" else 0)
+    conn.table("predictions").update({"status": result_status, "profit": profit}).eq("id", pid).execute()
+    return True
+
 def summary():
-    with connect() as c: rows=c.execute("SELECT status,profit FROM predictions WHERE status!='open'").fetchall()
-    return {"settled":len(rows),"won":sum(r["status"]=="won" for r in rows),"lost":sum(r["status"]=="lost" for r in rows),
-            "profit":sum(r["profit"] or 0 for r in rows)}
+    result = conn.table("predictions").select("status, profit").neq("status", "open").execute()
+    rows = result.data
+    return {
+        "settled": len(rows),
+        "won": sum(1 for r in rows if r["status"] == "won"),
+        "lost": sum(1 for r in rows if r["status"] == "lost"),
+        "profit": sum(r["profit"] or 0 for r in rows)
+    }
