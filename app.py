@@ -40,7 +40,7 @@ if page == "Матчи и прогнозы":
         if not events:
             st.warning("Сейчас нет подтверждённых матчей для отображения. Можно добавить матч вручную.")
         else:
-                        for i, e in enumerate(events):
+            for i, e in enumerate(events):
                 with st.container(border=True):
                     st.markdown(f"**{e['home']} — {e['away']}**")
                     st.caption(f"Начало: {e.get('start','неизвестно')} · Источник: {e.get('source','не указан')}")
