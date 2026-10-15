@@ -27,18 +27,6 @@ if page == "Матчи и прогнозы":
     sport = SPORTS[sport_label]
     st.subheader(sport_label)
     
-    if "last_result" in st.session_state and st.session_state["last_result"]["sport"] == sport:
-        r=st.session_state["last_result"]; p=r["p"]; e=r["event"]
-        st.subheader("Результат анализа")
-        st.markdown(f"### {e['home']} — {e['away']}")
-        a,b,c=st.columns(3)
-        a.metric("Исход модели",p["selection"])
-        b.metric("Оценка вероятности",f"{p['probability']:.1%}")
-        c.metric("Справедливый коэффициент",f"{p['fair_odds']:.2f}")
-        st.write("**Надёжность данных:**",p["confidence"])
-        st.write("**Объяснение:**",p["explanation"])
-        st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
-        
     if st.button("Загрузить доступные матчи", type="primary"):
         with st.spinner("Проверяю открытые источники…"):
             events, warning = get_events(sport)
@@ -52,18 +40,37 @@ if page == "Матчи и прогнозы":
         if not events:
             st.warning("Сейчас нет подтверждённых матчей для отображения. Можно добавить матч вручную.")
         else:
-            for i, e in enumerate(events):
+                        for i, e in enumerate(events):
                 with st.container(border=True):
                     st.markdown(f"**{e['home']} — {e['away']}**")
                     st.caption(f"Начало: {e.get('start','неизвестно')} · Источник: {e.get('source','не указан')}")
                     col1,col2=st.columns([1,3])
                     with col1:
                         if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
-                            p=predict(sport,e)
-                            pid=save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"],p["probability"],p["odds"],p["explanation"],p["confidence"])
-                            st.session_state["last_result"]={"event":e,"p":p,"id":pid,"sport":sport}
+                            with st.spinner("Анализирую и сохраняю..."):
+                                p=predict(sport,e)
+                                pid=save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"],p["probability"],p["odds"],p["explanation"],p["confidence"])
+                                st.session_state["last_result"]={"event":e,"p":p,"id":pid,"sport":sport}
+                            st.rerun()
                     with col2:
                         st.caption("Автоматические коэффициенты могут отсутствовать. Не делай выводов без проверки состава, формы и статуса матча.")
+                    
+                    # Вывод результата прямо внутри карточки
+                    if ("last_result" in st.session_state and 
+                        st.session_state["last_result"]["sport"] == sport and
+                        st.session_state["last_result"]["event"]["home"] == e["home"] and
+                        st.session_state["last_result"]["event"]["away"] == e["away"]):
+                        r = st.session_state["last_result"]
+                        p = r["p"]
+                        st.divider()
+                        st.markdown("### Результат анализа")
+                        a,b,c = st.columns(3)
+                        a.metric("Исход модели", p["selection"])
+                        b.metric("Оценка вероятности", f"{p['probability']:.1%}")
+                        c.metric("Справедливый коэффициент", f"{p['fair_odds']:.2f}")
+                        st.write("**Надёжность данных:**", p["confidence"])
+                        st.write("**Объяснение:**", p["explanation"])
+                        st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
     
 
 elif page == "Добавить матч вручную":
