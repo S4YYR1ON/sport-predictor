@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+predictions.sqlite3
+.streamlit/secrets.toml
