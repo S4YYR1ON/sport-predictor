@@ -26,6 +26,19 @@ if page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
     st.subheader(sport_label)
+    
+    if "last_result" in st.session_state and st.session_state["last_result"]["sport"] == sport:
+        r=st.session_state["last_result"]; p=r["p"]; e=r["event"]
+        st.subheader("Результат анализа")
+        st.markdown(f"### {e['home']} — {e['away']}")
+        a,b,c=st.columns(3)
+        a.metric("Исход модели",p["selection"])
+        b.metric("Оценка вероятности",f"{p['probability']:.1%}")
+        c.metric("Справедливый коэффициент",f"{p['fair_odds']:.2f}")
+        st.write("**Надёжность данных:**",p["confidence"])
+        st.write("**Объяснение:**",p["explanation"])
+        st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
+        
     if st.button("Загрузить доступные матчи", type="primary"):
         with st.spinner("Проверяю открытые источники…"):
             events, warning = get_events(sport)
@@ -51,17 +64,7 @@ if page == "Матчи и прогнозы":
                             st.session_state["last_result"]={"event":e,"p":p,"id":pid,"sport":sport}
                     with col2:
                         st.caption("Автоматические коэффициенты могут отсутствовать. Не делай выводов без проверки состава, формы и статуса матча.")
-    if "last_result" in st.session_state and st.session_state["last_result"]["sport"] == sport:
-        r=st.session_state["last_result"]; p=r["p"]; e=r["event"]
-        st.subheader("Результат анализа")
-        st.markdown(f"### {e['home']} — {e['away']}")
-        a,b,c=st.columns(3)
-        a.metric("Исход модели",p["selection"])
-        b.metric("Оценка вероятности",f"{p['probability']:.1%}")
-        c.metric("Справедливый коэффициент",f"{p['fair_odds']:.2f}")
-        st.write("**Надёжность данных:**",p["confidence"])
-        st.write("**Объяснение:**",p["explanation"])
-        st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
+    
 
 elif page == "Добавить матч вручную":
     st.subheader("Добавить матч")
