@@ -45,63 +45,60 @@ def get_tennis_events():
         response.raise_for_status()
         data = response.json()
 
-        # Определяем, где находится список матчей
+        # API возвращает список матчей
         if isinstance(data, list):
             matches_list = data
         elif isinstance(data, dict):
             matches_list = data.get("matches") or data.get("data") or []
-            if isinstance(matches_list, dict):
-                matches_list = matches_list.get("matches", [])
         else:
             matches_list = []
 
         if not matches_list:
-            return [], f"Ответ получен, но матчи не найдены. Первые 500 символов: {str(data)[:500]}"
+            return [], "Ответ получен, но матчи не найдены."
 
         events = []
         for match in matches_list:
             if not isinstance(match, dict):
                 continue
 
-            # Извлекаем имена игроков, пробуя разные варианты
-            def extract_name(obj):
-                if isinstance(obj, dict):
-                    return obj.get("name") or obj.get("player") or obj.get("full_name")
-                return str(obj) if obj else None
+            players = match.get("players") or {}
+            p1 = players.get("p1") or {}
+            p2 = players.get("p2") or {}
 
-            home = (
-                extract_name(match.get("player1")) or
-                extract_name(match.get("home_player")) or
-                extract_name(match.get("player_home")) or
-                extract_name(match.get("home")) or
-                extract_name(match.get("player1_name"))
-            )
-            away = (
-                extract_name(match.get("player2")) or
-                extract_name(match.get("away_player")) or
-                extract_name(match.get("player_away")) or
-                extract_name(match.get("away")) or
-                extract_name(match.get("player2_name"))
-            )
+            home = p1.get("name")
+            away = p2.get("name")
 
             if not home or not away:
-                # Показываем структуру одного матча для отладки
-                st.warning(f"⚠️ Не удалось распознать имена. Структура матча: {str(match)[:600]}")
                 continue
+
+            # Формируем дополнительную информацию
+            draw = match.get("draw", "")  # singles / doubles
+            status = match.get("event_status") or "scheduled"
+            has_market = match.get("has_market", False)
+
+            # Пропускаем уже завершённые матчи
+            if status == "Finished":
+                continue
+
+            start = match.get("created_at") or ""
+
+            # Формируем понятное название
+            draw_label = "Одиночный" if draw == "singles" else "Парный"
+            market_label = "коэф. есть" if has_market else "коэф. нет"
 
             events.append({
                 "home": home,
                 "away": away,
-                "start": match.get("start_time") or match.get("date") or match.get("start") or "",
-                "source": "Live Tennis API",
+                "start": start,
+                "source": f"Live Tennis API · {draw_label} · {market_label}",
                 "odds_home": None,
                 "odds_away": None
             })
 
         if not events:
-            return [], "Матчи получены, но имена игроков не распознаны. Смотри предупреждение выше."
+            return [], "Матчи получены, но подходящих не найдено."
 
-        return events, "Источник: Live Tennis API."
+        return events, f"Источник: Live Tennis API. Найдено матчей: {len(events)}."
     except Exception as e:
         return None, f"Ошибка Live Tennis API: {type(e).__name__} - {e}"
 
