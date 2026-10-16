@@ -294,22 +294,20 @@ elif page == "Матчи и прогнозы":
                                             st.caption("Отдых: данные устаревшие")
                                         else:
                                             st.write(f"Отдых: **{rh} дн.**")
-                                        if rh > 30:
-                                            st.caption(f"⚠️ Данные в базе устаревшие — последний матч более месяца назад.")
                                 with col_a:
                                     st.markdown(f"**{e['away']}**")
+                                    fa = match_stats["away"].get("form") or {}
+                                    if fa:
+                                        st.write(f"Форма (10): **{fa['wins']}-{fa['losses']}** ({fa['win_rate']:.0%})")
+                                    sa = match_stats["away"].get("surface") or {}
+                                    if sa:
+                                        st.write(f"Покрытие: **{sa['wins']}-{sa['matches'] - sa['wins']}** ({sa['win_rate']:.0%})")
                                     ra = match_stats["away"].get("rest")
                                     if ra is not None:
                                         if ra > 30:
                                             st.caption("Отдых: данные устаревшие")
                                         else:
                                             st.write(f"Отдых: **{ra} дн.**")
-                                    sa = match_stats["away"].get("surface") or {}
-                                    if sa:
-                                        st.write(f"Покрытие: **{sa['wins']}-{sa['matches'] - sa['wins']}** ({sa['win_rate']:.0%})")
-                                    ra = match_stats["away"].get("rest")
-                                    if ra is not None:
-                                        st.write(f"Отдых: **{ra} дн.**")
                                 h2h = match_stats["home"].get("h2h") or {}
                                 if h2h.get("total", 0) > 0:
                                     st.write(f"**H2H:** {h2h['a_wins']} — {h2h['b_wins']}")
