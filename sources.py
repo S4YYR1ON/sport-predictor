@@ -558,8 +558,6 @@ def get_elo_ratings(tour="atp"):
         return {}, "Тур должен быть 'atp' или 'wta'"
 
     url = f"https://tennisabstract.com/reports/{tour}_elo_ratings.html"
-    
-    # Ключевой момент — заголовок User-Agent
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -569,7 +567,6 @@ def get_elo_ratings(tour="atp"):
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         
-        # Передаём HTML-строку в pandas, а не URL
         from io import StringIO
         tables = pd.read_html(StringIO(response.text))
         
@@ -577,30 +574,15 @@ def get_elo_ratings(tour="atp"):
             st.error("🔍 Elo: таблицы не найдены")
             return {}, "Таблица Elo не найдена."
 
+        st.write(f"🔍 Elo: всего таблиц — {len(tables)}")
+        
         df = tables[0]
-        df.columns = [str(c).strip() for c in df.columns]
+        st.write(f"🔍 Elo: тип колонок — {type(df.columns).__name__}")
         st.write(f"🔍 Elo: колонки — {list(df.columns)}")
-
-        player_col = None
-        elo_col = None
-        for col in df.columns:
-            col_lower = str(col).lower()
-            if "player" in col_lower:
-                player_col = col
-            if col_lower == "elo":
-                elo_col = col
-
-        if not player_col or not elo_col:
-            st.error("🔍 Elo: не найдены колонки Player/Elo")
-            return {}, f"Не найдены колонки. Доступные: {list(df.columns)}"
-
-        df[elo_col] = pd.to_numeric(df[elo_col], errors="coerce")
-        df[player_col] = df[player_col].astype(str).str.strip()
-        df = df.dropna(subset=[elo_col, player_col])
-
-        elo_dict = dict(zip(df[player_col], df[elo_col]))
-        st.write(f"🔍 Elo: загружено игроков — {len(elo_dict)}")
-        return elo_dict, None
+        st.write(f"🔍 Elo: первые 3 строки:")
+        st.dataframe(df.head(3))
+        
+        return {}, "Отладка: смотри вывод выше."
         
     except Exception as e:
         st.error(f"🔍 Elo: исключение — {type(e).__name__} - {e}")
