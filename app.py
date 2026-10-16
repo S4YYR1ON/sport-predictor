@@ -48,9 +48,22 @@ if page == "Матчи и прогнозы":
                     with col1:
                         if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
                             with st.spinner("Анализирую и сохраняю..."):
-                                p=predict(sport,e)
-                                pid=save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"],p["probability"],p["odds"],p["explanation"],p["confidence"])
-                                st.session_state["last_result"]={"event":e,"p":p,"id":pid,"sport":sport}
+                                # Пытаемся получить коэффициенты, если есть match_id
+                                odds_home, odds_away = None, None
+                                odds_error = None
+                                
+                                if e.get("has_market") and e.get("match_id"):
+                                    odds_result, odds_error = get_match_odds(e["match_id"])
+                                    if odds_result:
+                                        odds_home = odds_result.get("home")
+                                        odds_away = odds_result.get("away")
+                                        # Подставляем в событие, чтобы predict их использовал
+                                        e["odds_home"] = odds_home
+                                        e["odds_away"] = odds_away
+                                
+                                p = predict(sport, e)
+                                pid = save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"], p["probability"], p["odds"], p["explanation"], p["confidence"])
+                                st.session_state["last_result"] = {"event": e, "p": p, "id": pid, "sport": sport, "odds_error": odds_error}
                             st.rerun()
                     with col2:
                         st.caption("Автоматические коэффициенты могут отсутствовать. Не делай выводов без проверки состава, формы и статуса матча.")
