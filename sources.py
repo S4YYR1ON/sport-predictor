@@ -430,12 +430,16 @@ def get_pinnapi_tennis_events():
 
     try:
         api = PinnapiClient(api_key)
-        fixtures = api.prematch_fixtures(sport_id=SPORTS["tennis"])
+        response = api.prematch_fixtures(sport_id=SPORTS["tennis"])
 
-        # 🔍 Отладка: показываем тип и структуру ответа
+        # Извлекаем список событий
+        events_list = response.get("events", []) if isinstance(response, dict) else []
+
         st.write("**🔍 Отладка Pinnapi:**")
-        st.write(f"Тип ответа: `{type(fixtures).__name__}`")
-        st.json(fixtures if isinstance(fixtures, (list, dict)) else str(fixtures)[:1000])
+        st.write(f"Всего событий: `{len(events_list)}`")
+        if events_list:
+            st.write("**Структура первого события:**")
+            st.json(events_list[0])
 
         return None, "Отладка: смотри вывод выше."
     except Exception as e:
