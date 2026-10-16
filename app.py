@@ -64,12 +64,17 @@ if page == "Bet Better (ATP/WTA)":
             "Показывать только матчи с потенциальным VALUE",
             value=False
         )
+        show_locked = st.checkbox(
+            "Показывать заблокированные Moneyline (откроются в момент матча)",
+            value=False
+        )
 
         # Перевод уверенности на русский
         CONF_RU = {
             "HIGH": "🟢 ВЫСОКАЯ",
             "LEAN": "🟡 УМЕРЕННАЯ",
             "LONG-SHOT": "🔴 РИСКОВАННАЯ",
+            "LOCKED": "🔒 ЗАБЛОКИРОВАНО (откроется в момент матча)",
         }
 
         # Фильтрация
@@ -78,6 +83,8 @@ if page == "Bet Better (ATP/WTA)":
             filtered = [p for p in filtered if p.get("confidence") in ("HIGH", "LEAN")]
         if show_only_value:
             filtered = [p for p in filtered if (p.get("value") or 0) > 0]
+        if not show_locked:
+            filtered = [p for p in filtered if not p.get("locked")]
 
         st.success(f"Найдено прогнозов: {len(filtered)} (из {len(picks)})")
 
