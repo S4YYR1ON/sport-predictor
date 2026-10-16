@@ -432,16 +432,56 @@ def get_pinnapi_tennis_events():
         api = PinnapiClient(api_key)
         response = api.prematch_fixtures(sport_id=SPORTS["tennis"])
 
-        # Извлекаем список событий
         events_list = response.get("events", []) if isinstance(response, dict) else []
+        if not events_list:
+            return [], "Pinnapi не вернул событий."
 
-        st.write("**🔍 Отладка Pinnapi:**")
-        st.write(f"Всего событий: `{len(events_list)}`")
-        if events_list:
-            st.write("**Структура первого события:**")
-            st.json(events_list[0])
+        now_utc = datetime.utcnow()
 
-        return None, "Отладка: смотри вывод выше."
+        events = []
+        for ev in events_list:
+            if not isinstance(ev, dict):
+                continue
+            # Только предматчевые матчи
+            if ev.get("event_type") != "prematch":
+                continue
+
+            # Только будущие матчи
+            start_ts = ev.get("start_ts") or ev.get("starts") or ""
+            try:
+                clean = start_ts.split(".")[0].replace("Z", "")
+                dt = datetime.fromisoformat(clean)
+                if dt < now_utc:
+                    continue
+            except Exception:
+                pass
+
+            home = ev.get("home")
+            away = ev.get("away")
+            if not home or not away:
+                continue
+
+            # Ищем Moneyline в periods.num_0
+            odds_home = None
+            odds_away = None
+            periods = ev.get("periods") or {}
+            main = periods.get("num_0") or {}
+            ml = main.get("money_line")
+            if isinstance(ml, dict):
+                odds_home = ml.get("home")
+                odds_away = ml.get("away")
+
+            events.append({
+                "home": home,
+                "away": away,
+                "start": start_ts,
+                "source": "Pinnapi · Pinnacle (Moneyline)" + (" · коэф. есть" if odds_home else " · коэф. нет"),
+                "odds_home": odds_home,
+                "odds_away": odds_away,
+                "match_id": ev.get("event_id"),
+            })
+
+        return events, f"Pinnapi: найдено матчей {len(events)}."
     except Exception as e:
         return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
         
