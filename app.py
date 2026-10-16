@@ -3,17 +3,18 @@ import pandas as pd
 from db import init_db, save_prediction, list_predictions, settle_prediction, summary
 from predictor import predict
 from sources import get_events, source_status
-from datetime import datetime
+
+from datetime import datetime, timedelta
 
 def format_time(raw):
-    """Превращает '2026-10-17T08:30:00.0000000Z' в '17.10.2026 08:30'."""
+    """Превращает '2026-10-17T08:30:00.0000000Z' (UTC) в '17.10.2026 11:30' (МСК)."""
     if not raw:
         return "неизвестно"
     try:
-        # Отрезаем лишние нули после секунд
         clean = raw.split(".")[0].replace("Z", "")
-        dt = datetime.fromisoformat(clean)
-        return dt.strftime("%d.%m.%Y %H:%M")
+        dt_utc = datetime.fromisoformat(clean)
+        dt_msk = dt_utc + timedelta(hours=3)
+        return dt_msk.strftime("%d.%m.%Y %H:%M") + " МСК"
     except Exception:
         return str(raw)
         
