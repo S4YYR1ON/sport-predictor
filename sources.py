@@ -269,7 +269,39 @@ def get_events(sport):
         return [], "Источник CS2 не подключён."
 
     return [], "Нет доступных матчей."
-
+    
+def get_all_betbetter_picks():
+    """Получает все прогнозы Bet Better для тенниса (ATP + WTA)."""
+    all_picks = []
+    errors = []
+    for tour, label in [("tennis/atp", "ATP"), ("tennis/wta", "WTA")]:
+        try:
+            feed = betbetter.get_picks(tour)
+            picks = feed.get("picks", [])
+            for p in picks:
+                if p.get("locked"):
+                    continue
+                game = p.get("game", "")
+                selection = (p.get("selection") or "").strip()
+                if not game or not selection or " @ " not in game:
+                    continue
+                home, away = game.split(" @ ", 1)
+                all_picks.append({
+                    "tour": label,
+                    "home": home.strip(),
+                    "away": away.strip(),
+                    "game_time": p.get("gameTimeUtc", ""),
+                    "market": p.get("market", ""),
+                    "selection": selection,
+                    "probability": p.get("modelProbabilityPct"),
+                    "fair_odds": p.get("fairOdds"),
+                    "confidence": p.get("confidence", ""),
+                    "verdict": p.get("verdict", ""),
+                })
+        except Exception as e:
+            errors.append(f"{label}: {type(e).__name__}")
+    return all_picks, ("Ошибки: " + "; ".join(errors)) if errors else None
+    
 def source_status():
     out = {}
     try:
