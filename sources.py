@@ -32,10 +32,21 @@ def is_top_tournament(league_name):
     if not league_name:
         return False
     name_lower = league_name.lower()
-    # Исключаем ITF и Challenger, если они явно указаны
-    if "itf" in name_lower or "challenger" in name_lower:
+    
+    # Исключаем всё, что точно не топ
+    exclude = ["itf", "challenger", "w15", "w25", "w35", "w50", "w75", "w100",
+               "m15", "m25", "wta 125", "atp 125", "125k", "doubles"]
+    if any(word in name_lower for word in exclude):
         return False
-    return any(kw in name_lower for kw in TOP_TOUR_KEYWORDS)
+    
+    # Оставляем только то, где явно указан ATP/WTA 250+ или ТБШ
+    include = [
+        "atp 250", "atp 500", "atp 1000", "atp masters", "atp finals",
+        "wta 250", "wta 500", "wta 1000", "wta masters", "wta finals",
+        "grand slam", "australian open", "roland garros", "wimbledon", "us open",
+        "atp tour", "wta tour",
+    ]
+    return any(word in name_lower for word in include)
     
 import betbetter
 import requests
@@ -509,6 +520,9 @@ def get_pinnapi_tennis_events():
 
             # Пропускаем дубликаты с суффиксом "(Games)" — это отдельный рынок гандикапов
             if "(Games)" in home or "(Games)" in away or "(games)" in home or "(games)" in away:
+                continue
+            # Пропускаем парные матчи (в имени есть "/")
+            if "/" in home or "/" in away:
                 continue
 
             # Ищем Moneyline в periods.num_0
