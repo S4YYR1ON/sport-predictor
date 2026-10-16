@@ -116,7 +116,49 @@ if page == "Bet Better (ATP/WTA)":
                 # === Уверенность модели ===
                 conf_ru = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
                 st.caption(f"Уверенность модели: **{conf_ru}**")
-
+                
+                # === Проверка value с кэфом букмекера (ввод вручную) ===
+                prob = p.get("probability")
+                fair = p.get("fair_odds")
+                if prob is not None and fair is not None:
+                    with st.expander("🔍 Проверить value с кэфом букмекера (BetBoom и др.)", expanded=False):
+                        bookie_odd = st.number_input(
+                            "Введи кэф букмекера на этот исход",
+                            min_value=1.01,
+                            max_value=100.0,
+                            value=float(round(fair, 2)),
+                            step=0.01,
+                            key=f"bookie_odd_{i}"
+                        )
+                        if bookie_odd:
+                            val = (prob / 100.0) * bookie_odd - 1
+                            col1, col2 = st.columns(2)
+                            col1.metric("Кэф букмекера", f"{bookie_odd:.2f}")
+                            col2.metric("Value", f"{val:+.1%}")
+                            
+                            if val > 0.02:
+                                st.success(
+                                    f"✅ **VALUE есть!** Вероятность модели {prob}% × кэф {bookie_odd:.2f} = "
+                                    f"{1+val:.3f}. На длинной дистанции это плюс."
+                                )
+                            elif val > -0.02:
+                                st.warning(
+                                    f"⚠️ **Value на грани:** {val:+.1%}. "
+                                    f"Ставка почти нейтральная — маржа букмекера съедает весь запас."
+                                )
+                            else:
+                                st.error(
+                                    f"❌ **Value нет:** {val:+.1%}. "
+                                    f"Для положительного value нужен кэф **минимум {fair:.2f}**, "
+                                    f"а букмекер даёт только {bookie_odd:.2f}. Ставить невыгодно."
+                                )
+                            
+                            st.caption(
+                                f"Справедливый кэф модели: **{fair:.2f}** · "
+                                f"Минимальный кэф для value: **{fair:.2f}** · "
+                                f"Текущий кэф букмекера: **{bookie_odd:.2f}**"
+                            )
+                            
                 # === Сопоставление с Pinnacle и расчёт VALUE ===
                 if p.get("match_found"):
                     if p.get("market_odd"):
