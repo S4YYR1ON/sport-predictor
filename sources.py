@@ -553,23 +553,34 @@ import pandas as pd
 
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
-    """Скачивает актуальные Elo-рейтинги с Tennis Abstract."""
+    """Скачивает Elo-рейтинги с Tennis Abstract, притворяясь браузером."""
     if tour not in ("atp", "wta"):
         return {}, "Тур должен быть 'atp' или 'wta'"
+
+    url = f"https://tennisabstract.com/reports/{tour}_elo_ratings.html"
     
-    url = f"http://tennisabstract.com/reports/{tour}_elo_ratings.html"
+    # Ключевой момент — заголовок User-Agent
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     try:
-        tables = pd.read_html(url)
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        # Передаём HTML-строку в pandas, а не URL
+        from io import StringIO
+        tables = pd.read_html(StringIO(response.text))
+        
         if not tables:
-            st.error("🔍 Elo: таблицы не найдены на странице")
-            return {}, "Таблица Elo не найдена на странице."
-        
-        st.write(f"🔍 Elo: загружено таблиц — {len(tables)}")
-        
+            st.error("🔍 Elo: таблицы не найдены")
+            return {}, "Таблица Elo не найдена."
+
         df = tables[0]
         df.columns = [str(c).strip() for c in df.columns]
         st.write(f"🔍 Elo: колонки — {list(df.columns)}")
-        
+
         player_col = None
         elo_col = None
         for col in df.columns:
@@ -578,23 +589,22 @@ def get_elo_ratings(tour="atp"):
                 player_col = col
             if col_lower == "elo":
                 elo_col = col
-        
+
         if not player_col or not elo_col:
-            st.error(f"🔍 Elo: не найдены колонки Player/Elo")
-            return {}, f"Не найдены колонки Player/Elo. Доступные: {list(df.columns)}"
-        
+            st.error("🔍 Elo: не найдены колонки Player/Elo")
+            return {}, f"Не найдены колонки. Доступные: {list(df.columns)}"
+
         df[elo_col] = pd.to_numeric(df[elo_col], errors="coerce")
         df[player_col] = df[player_col].astype(str).str.strip()
         df = df.dropna(subset=[elo_col, player_col])
-        
+
         elo_dict = dict(zip(df[player_col], df[elo_col]))
         st.write(f"🔍 Elo: загружено игроков — {len(elo_dict)}")
-        st.write(f"🔍 Elo: первые 3 примера — {list(elo_dict.items())[:3]}")
-        
         return elo_dict, None
+        
     except Exception as e:
         st.error(f"🔍 Elo: исключение — {type(e).__name__} - {e}")
-        return {}, f"Ошибка загрузки Elo: {type(e).__name__} - {e}"
+        return {}, f"Ошибка Elo: {type(e).__name__} - {e}"
 
 def find_elo_player(elo_dict, player_name):
     """Ищет игрока в словаре Elo по фамилии (Tennis Abstract использует полные имена)."""
