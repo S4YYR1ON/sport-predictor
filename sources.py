@@ -13,12 +13,24 @@ EUROPE_KEYWORDS = [
     "amsterdam", "brussels", "dublin", "europe"
 ]
 
-def is_european_league(league_name):
-    """Проверяет, относится ли турнир к Европе по названию лиги."""
+# Категории турниров, на которые BetBoom точно даёт линию
+TOP_TOUR_KEYWORDS = [
+    "atp 250", "atp 500", "atp 1000", "atp masters", "atp finals",
+    "wta 250", "wta 500", "wta 1000", "wta masters", "wta finals",
+    "grand slam", "australian open", "roland garros", "wimbledon", "us open",
+    "atp", "wta"  # общее упоминание тура
+]
+
+def is_top_tournament(league_name):
+    """Проверяет, относится ли турнир к ATP/WTA 250+ или ТБШ."""
     if not league_name:
         return False
     name_lower = league_name.lower()
-    return any(kw in name_lower for kw in EUROPE_KEYWORDS)
+    # Исключаем ITF и Challenger, если они явно указаны
+    if "itf" in name_lower or "challenger" in name_lower:
+        return False
+    return any(kw in name_lower for kw in TOP_TOUR_KEYWORDS)
+    
 import betbetter
 import requests
 import streamlit as st
@@ -264,8 +276,9 @@ def get_events(sport, region="all"):
     if sport == "tennis":
         events, error = get_pinnapi_tennis_events()
         if events:
-            if region == "europe":
-                events = [e for e in events if is_european_league(e.get("league_name", ""))]
+            # Фильтр: только топ-турниры (ATP/WTA 250+ и ТБШ), где BetBoom даёт линию
+            if region == "top":
+                events = [e for e in events if is_top_tournament(e.get("league_name", ""))]
             return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
         st.warning(f"Pinnapi недоступен: {error}. Пробую Bet Better.")
         # ... резервный код Bet Better без изменений ...
