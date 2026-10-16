@@ -1,3 +1,4 @@
+import betbetter
 import requests
 import streamlit as st
 from datetime import datetime
@@ -9,11 +10,14 @@ PINNWIRE_BASE = "https://pinnwire.com/kit/v1"
 
 @st.cache_data(ttl=600)
 def get_pinnwire_tennis_odds():
-    """Получает теннисные матчи и коэффициенты из PinnWire."""
+    """Получает теннисные матчи из PinnWire и обогащает их данными Bet Better."""
     try:
         api_key = st.secrets["PINNWIRE_API_KEY"]
     except (KeyError, FileNotFoundError):
         return None, "Ключ PinnWire не настроен."
+
+    # Загружаем прогнозы Bet Better
+    model_data, bb_error = get_betbetter_tennis_picks()
 
     url = f"{PINNWIRE_BASE}/markets"
     params = {"sport_id": 2, "key": api_key}
@@ -36,11 +40,13 @@ def get_pinnwire_tennis_odds():
             if not home or not away:
                 continue
 
-            # Очистка имён
             def clean_name(n):
                 return str(n).replace("(Games)", "").replace("(games)", "").strip()
 
-            # Ищем money_line в periods.num_0 (матч)
+            home_clean = clean_name(home)
+            away_clean = clean_name(away)
+
+            # Коэффициенты из PinnWire
             odds_home = None
             odds_away = None
             periods = match.get("periods") or {}
@@ -49,21 +55,65 @@ def get_pinnwire_tennis_odds():
             if isinstance(money_line, dict):
                 odds_home = money_line.get("home")
                 odds_away = money_line.get("away")
+            else:
+                # Если money_line нет — берём спред -1.5 как приближение
+                spreads = main_period.get("spreads") or {}
+                spread = spreads.get("-1.5") or {}
+                if spread:
+                    odds_home = spread.get("home")
+                    odds_away = spread.get("away")
+
+            # Данные модели Bet Better
+            bb_home = model_data.get(home_clean.lower())
+            bb_away = model_data.get(away_clean.lower())
 
             events.append({
-                "home": clean_name(home),
-                "away": clean_name(away),
+                "home": home_clean,
+                "away": away_clean,
                 "start": match.get("start_ts") or match.get("starts") or "",
                 "source": "PinnWire · Pinnacle" + (" · коэф. есть" if odds_home else " · коэф. нет"),
                 "odds_home": odds_home,
                 "odds_away": odds_away,
                 "match_id": match.get("event_id"),
+                # Данные модели Bet Better
+                "bb_home_prob": bb_home["probability"] if bb_home else None,
+                "bb_home_fair": bb_home["fair_odds"] if bb_home else None,
+                "bb_home_conf": bb_home["confidence"] if bb_home else None,
+                "bb_away_prob": bb_away["probability"] if bb_away else None,
+                "bb_away_fair": bb_away["fair_odds"] if bb_away else None,
+                "bb_away_conf": bb_away["confidence"] if bb_away else None,
             })
 
         return events, None
     except Exception as e:
         return None, f"Ошибка PinnWire: {type(e).__name__} - {e}"
-
+    
+# ===================
+@st.cache_data(ttl=600)
+def get_betbetter_tennis_picks():
+    """Получает вероятности и fair odds от модели Bet Better для тенниса."""
+    try:
+        feed = betbetter.get_picks("tennis/atp")
+        picks = feed.get("picks", [])
+        # Строим словарь: ключ — имя игрока, значение — данные модели
+        model_data = {}
+        for p in picks:
+            game = p.get("game", "")
+            selection = p.get("selection", "")
+            prob = p.get("modelProbabilityPct")
+            fair_odds = p.get("fairOdds")
+            confidence = p.get("confidence", "")
+            if selection:
+                model_data[selection.lower()] = {
+                    "probability": prob,
+                    "fair_odds": fair_odds,
+                    "confidence": confidence,
+                    "game": game
+                }
+        return model_data, None
+    except Exception as e:
+        return {}, f"Ошибка Bet Better: {type(e).__name__} - {e}"
+        
 # ========== Live Tennis API (резерв без коэффициентов) ==========
 LIVETENNIS_BASE = "https://api.livetennisapi.com/api/public/v1"
 
