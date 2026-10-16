@@ -5,7 +5,7 @@ from datetime import datetime
 TIMEOUT = 10
 
 # ========== PinnWire (теннис + коэффициенты) ==========
-PINNWIRE_BASE = "https://api.pinnwire.com/kit/v1"
+PINNWIRE_BASE = "https://pinnwire.com/kit/v1"
 
 @st.cache_data(ttl=600)
 def get_pinnwire_tennis_odds():
