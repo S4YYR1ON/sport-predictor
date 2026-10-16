@@ -7,10 +7,6 @@ import betbetter
 
 TIMEOUT = 15
 
-# ============================================================
-# БАЗОВЫЕ НАСТРОЙКИ
-# ============================================================
-
 EUROPE_KEYWORDS = [
     "atp", "wta", "challenger", "itf",
     "spain", "france", "italy", "germany", "uk", "england", "sweden",
@@ -23,12 +19,11 @@ EUROPE_KEYWORDS = [
     "basel", "stockholm", "copenhagen", "oslo", "helsinki",
     "prague", "warsaw", "budapest", "bucharest", "sofia",
     "zagreb", "belgrade", "istanbul", "athens", "lisbon",
-    "amsterdam", "brussels", "dublin", "europe"
+    "amsterdam", "brussels", "dublin", "europe",
 ]
 
 
 def is_european_league(league_name):
-    """Проверяет, относится ли турнир к Европе по названию."""
     if not league_name:
         return False
     name_lower = league_name.lower()
@@ -36,7 +31,6 @@ def is_european_league(league_name):
 
 
 def is_top_tournament(league_name):
-    """Проверяет, относится ли турнир к ATP/WTA (кроме Challenger/ITF)."""
     if not league_name:
         return False
     name_lower = league_name.lower()
@@ -50,43 +44,20 @@ def is_top_tournament(league_name):
 
 
 TOURNAMENT_SURFACE = {
-    "australian open": "hard",
-    "roland garros": "clay",
-    "french open": "clay",
-    "wimbledon": "grass",
-    "us open": "hard",
-    "indian wells": "hard",
-    "miami": "hard",
-    "monte carlo": "clay",
-    "madrid": "clay",
-    "rome": "clay",
-    "canada": "hard",
-    "cincinnati": "hard",
-    "shanghai": "hard",
-    "paris masters": "hard",
-    "vienna": "hard",
-    "basel": "hard",
-    "halle": "grass",
-    "queens": "grass",
-    "barcelona": "clay",
-    "hamburg": "clay",
-    "tokyo": "hard",
-    "beijing": "hard",
-    "dubai": "hard",
-    "acapulco": "hard",
-    "rio": "clay",
-    "doha": "hard",
-    "charleston": "clay",
-    "stuttgart": "clay",
-    "eastbourne": "grass",
-    "berlin": "grass",
-    "wuhan": "hard",
-    "guadalajara": "hard",
+    "australian open": "hard", "roland garros": "clay", "french open": "clay",
+    "wimbledon": "grass", "us open": "hard", "indian wells": "hard",
+    "miami": "hard", "monte carlo": "clay", "madrid": "clay", "rome": "clay",
+    "canada": "hard", "cincinnati": "hard", "shanghai": "hard",
+    "paris masters": "hard", "vienna": "hard", "basel": "hard",
+    "halle": "grass", "queens": "grass", "barcelona": "clay",
+    "hamburg": "clay", "tokyo": "hard", "beijing": "hard", "dubai": "hard",
+    "acapulco": "hard", "rio": "clay", "doha": "hard", "charleston": "clay",
+    "stuttgart": "clay", "eastbourne": "grass", "berlin": "grass",
+    "wuhan": "hard", "guadalajara": "hard",
 }
 
 
 def get_surface(league_name):
-    """Определяет покрытие по названию турнира."""
     if not league_name:
         return "hard"
     name_lower = league_name.lower()
@@ -96,13 +67,8 @@ def get_surface(league_name):
     return "hard"
 
 
-# ============================================================
-# PINNAPI (теннис + Moneyline)
-# ============================================================
-
 @st.cache_data(ttl=600)
 def get_pinnapi_tennis_events():
-    """Получает предматчевые теннисные матчи и коэффициенты Moneyline из Pinnapi."""
     try:
         api_key = st.secrets["PINNAPI_API_KEY"]
     except (KeyError, FileNotFoundError):
@@ -111,14 +77,12 @@ def get_pinnapi_tennis_events():
     try:
         api = PinnapiClient(api_key)
         response = api.prematch_fixtures(sport_id=SPORTS["tennis"])
-
         events_list = response.get("events", []) if isinstance(response, dict) else []
         if not events_list:
             return [], "Pinnapi не вернул событий."
 
         now_utc = datetime.utcnow()
         events = []
-
         for ev in events_list:
             if not isinstance(ev, dict):
                 continue
@@ -138,7 +102,6 @@ def get_pinnapi_tennis_events():
             away = ev.get("away")
             if not home or not away:
                 continue
-
             if "(Games)" in home or "(Games)" in away:
                 continue
             if "/" in home or "/" in away:
@@ -170,13 +133,8 @@ def get_pinnapi_tennis_events():
         return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
 
 
-# ============================================================
-# ELO (Tennis Abstract)
-# ============================================================
-
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
-    """Скачивает Elo-рейтинги с Tennis Abstract."""
     if tour not in ("atp", "wta"):
         return {}, "Тур должен быть 'atp' или 'wta'"
 
@@ -185,23 +143,17 @@ def get_elo_ratings(tour="atp"):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-
         from io import StringIO
         tables = pd.read_html(StringIO(response.text))
-
         if len(tables) < 2:
             return {}, "Не найдена таблица с рейтингами."
-
         df = tables[1].copy()
         df.columns = [str(c).replace("\xa0", " ").strip() for c in df.columns]
-
         if "Player" not in df.columns or "Elo" not in df.columns:
-            return {}, f"Не найдены колонки Player/Elo. Есть: {list(df.columns)}"
-
+            return {}, f"Не найдены колонки Player/Elo."
         df["Elo"] = pd.to_numeric(df["Elo"], errors="coerce")
         df["Player"] = df["Player"].astype(str).str.strip()
         df = df.dropna(subset=["Elo", "Player"])
@@ -214,18 +166,12 @@ def get_elo_ratings(tour="atp"):
                 "cElo": pd.to_numeric(row.get("cElo"), errors="coerce"),
                 "gElo": pd.to_numeric(row.get("gElo"), errors="coerce"),
             }
-
         return elo_dict, None
     except Exception as e:
         return {}, f"Ошибка Elo: {type(e).__name__} - {e}"
 
 
-# ============================================================
-# BET BETTER
-# ============================================================
-
 def get_all_betbetter_picks():
-    """Получает прогнозы Bet Better для тенниса (ATP + WTA)."""
     all_picks = []
     errors = []
     for tour, label in [("tennis/atp", "ATP"), ("tennis/wta", "WTA")]:
@@ -278,10 +224,6 @@ def get_all_betbetter_picks():
     return all_picks, ("Ошибки: " + "; ".join(errors)) if errors else None
 
 
-# ============================================================
-# ESPN (футбол, резерв)
-# ============================================================
-
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports"
 ESPN_PATHS = {
     "football": [
@@ -332,10 +274,6 @@ def get_espn_events(sport):
     return events, warning
 
 
-# ============================================================
-# ГЛАВНАЯ ФУНКЦИЯ
-# ============================================================
-
 def get_events(sport, region="all", tour_filter="all"):
     if sport == "tennis":
         events, error = get_pinnapi_tennis_events()
@@ -375,11 +313,6 @@ def source_status():
         out["Pinnapi"] = "ключ есть" if api_key else "ключ не настроен"
     except Exception:
         out["Pinnapi"] = "ошибка"
-    try:
-        api_key = st.secrets.get("PINNWIRE_API_KEY", "")
-        out["PinnWire"] = "ключ есть" if api_key else "не используется"
-    except Exception:
-        out["PinnWire"] = "ошибка"
     out["ESPN"] = "резервный источник"
     out["BetBoom"] = "не подключён"
     return out
