@@ -95,6 +95,8 @@ def get_betbetter_tennis_picks():
     try:
         feed = betbetter.get_picks("tennis/atp")
         picks = feed.get("picks", [])
+        st.write("**🔍 Отладка Bet Better — первые 3 прогноза:**")
+        st.json(picks[:3] if picks else "Пусто")
         # Строим словарь: ключ — имя игрока, значение — данные модели
         model_data = {}
         for p in picks:
