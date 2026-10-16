@@ -253,13 +253,14 @@ elif page == "Матчи и прогнозы":
                                         e["odds_away"] = odds_away
                                 
                                 # Определяем тур по названию лиги
+                                # Определяем тур по названию лиги
                                 league = (e.get("league_name") or "").upper()
                                 if "WTA" in league:
                                     tour_key = "wta"
                                 elif "ATP" in league:
                                     tour_key = "atp"
                                 else:
-                                    tour_key = "atp"  # fallback
+                                    tour_key = "atp"
                                 
                                 elo_dict, _ = get_elo_ratings(tour=tour_key)
                                 
@@ -268,11 +269,14 @@ elif page == "Матчи и прогнозы":
                                 if not (find_elo_player(elo_dict, e.get("home", "")) and find_elo_player(elo_dict, e.get("away", ""))):
                                     alt_tour = "wta" if tour_key == "atp" else "atp"
                                     alt_elo, _ = get_elo_ratings(tour=alt_tour)
-                                    # Если в альтернативном туре нашлись оба игрока — используем его
                                     if (find_elo_player(alt_elo, e.get("home", "")) and find_elo_player(alt_elo, e.get("away", ""))):
                                         elo_dict = alt_elo
                                 
-                                p = predict(sport, e, elo_dict=elo_dict)
+                                # Определяем покрытие
+                                from sources import get_surface
+                                surface = get_surface(e.get("league_name", ""))
+                                
+                                p = predict(sport, e, elo_dict=elo_dict, surface=surface)
                                 pid = save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"], p["probability"], p["odds"], p["explanation"], p["confidence"])
                                 st.session_state["last_result"] = {"event": e, "p": p, "id": pid, "sport": sport, "odds_error": odds_error}
                             st.rerun()
