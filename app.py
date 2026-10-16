@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from db import init_db, save_prediction, list_predictions, settle_prediction, summary
 from predictor import predict
-from sources import get_events, source_status
+from sources import get_events, source_status, get_elo_ratings
 
 from datetime import datetime, timedelta
 
@@ -252,7 +252,9 @@ elif page == "Матчи и прогнозы":
                                         e["odds_home"] = odds_home
                                         e["odds_away"] = odds_away
                                 
-                                p = predict(sport, e)
+                                # Загружаем Elo-рейтинги (кэш 24 часа)
+                                elo_dict, _ = get_elo_ratings(tour="atp" if sport == "tennis" else "atp")
+                                p = predict(sport, e, elo_dict=elo_dict)
                                 pid = save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"], p["probability"], p["odds"], p["explanation"], p["confidence"])
                                 st.session_state["last_result"] = {"event": e, "p": p, "id": pid, "sport": sport, "odds_error": odds_error}
                             st.rerun()
