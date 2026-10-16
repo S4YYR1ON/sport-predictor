@@ -423,7 +423,55 @@ def get_betbetter_with_value():
         pick["match_found"] = match_found is not None
 
     return all_picks, None
-    
+from pinnapi import Client as PinnapiClient, SPORTS
+
+@st.cache_data(ttl=600)
+def get_pinnapi_tennis_events():
+    """Получает предматчевые теннисные матчи и коэффициенты Moneyline из Pinnapi."""
+    try:
+        api_key = st.secrets["PINNAPI_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        return None, "Ключ Pinnapi не настроен."
+
+    try:
+        api = PinnapiClient(api_key)
+        # sport_id=2 — теннис
+        fixtures = api.prematch_fixtures(sport_id=SPORTS["tennis"])
+        
+        events = []
+        for fixture in fixtures:
+            home = fixture.get("home")
+            away = fixture.get("away")
+            if not home or not away:
+                continue
+
+            odds_home = None
+            odds_away = None
+            
+            # Ищем рынок Moneyline в списке markets
+            markets = fixture.get("markets", [])
+            for market in markets:
+                if market.get("type") == "moneyline":
+                    for price in market.get("prices", []):
+                        if price.get("designation") == "home":
+                            odds_home = price.get("price")
+                        elif price.get("designation") == "away":
+                            odds_away = price.get("price")
+                    break
+
+            events.append({
+                "home": home,
+                "away": away,
+                "start": fixture.get("startTime", ""),
+                "source": "Pinnapi · Pinnacle (Moneyline)",
+                "odds_home": odds_home,
+                "odds_away": odds_away,
+                "match_id": fixture.get("id"),
+            })
+        return events, None
+    except Exception as e:
+        return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
+        
 def source_status():
     out = {}
     try:
