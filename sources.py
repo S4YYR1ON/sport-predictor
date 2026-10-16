@@ -16,17 +16,19 @@ def get_pinnwire_tennis_odds():
         return None, "Ключ PinnWire не настроен."
 
     url = f"{PINNWIRE_BASE}/markets"
-    params = {"sport_id": 2, "key": api_key}  # sport_id=2 — теннис
+    params = {"sport_id": 2, "key": api_key}
 
     try:
         response = requests.get(url, params=params, timeout=TIMEOUT)
-        if response.status_code in [401, 403]:
-            return None, "PinnWire: неверный ключ или нет доступа."
         response.raise_for_status()
         data = response.json()
 
-        # PinnWire может возвращать список в разных полях
         matches = data.get("events") or data.get("data") or data.get("markets") or []
+
+        # 🔍 ОТЛАДКА: показываем первый матч целиком
+        if matches:
+            st.write("**🔍 Отладка PinnWire — структура первого матча:**")
+            st.json(matches[0])
 
         events = []
         for match in matches:
@@ -39,10 +41,12 @@ def get_pinnwire_tennis_odds():
             odds_away = odds.get("away") if isinstance(odds, dict) else None
 
             if home and away:
+                def clean_name(n):
+                    return str(n).replace("(Games)", "").replace("(games)", "").strip()
                 events.append({
-                    "home": home,
-                    "away": away,
-                    "start": match.get("start_time") or match.get("commence_time", ""),
+                    "home": clean_name(home),
+                    "away": clean_name(away),
+                    "start": match.get("start_time") or match.get("commence_time") or match.get("date") or "",
                     "source": "PinnWire · Pinnacle",
                     "odds_home": odds_home,
                     "odds_away": odds_away,
