@@ -205,13 +205,23 @@ if page == "Bet Better (ATP/WTA)":
 elif page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
-    region = st.selectbox("Регион", ["Все", "Европа"])
-    region_key = "europe" if region == "Европа" else "all"
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        region = st.selectbox("Регион", ["Все", "Европа"])
+        region_key = "europe" if region == "Европа" else "all"
+    with col_f2:
+        tour_filter = st.selectbox(
+            "Фильтр турниров",
+            ["Все турниры", "Только топ (ATP/WTA 250+, ТБШ)"]
+        )
+        tour_filter_key = "top" if tour_filter == "Только топ (ATP/WTA 250+, ТБШ)" else "all"
+    
     st.subheader(sport_label)
     
     if st.button("Загрузить доступные матчи", type="primary"):
         with st.spinner("Проверяю открытые источники…"):
-            events, warning = get_events(sport, region=region_key)
+            events, warning = get_events(sport, region=region_key, tour_filter=tour_filter_key)
         st.session_state["events"] = events
         st.session_state["events_sport"] = sport
         st.session_state["events_warning"] = warning
