@@ -25,33 +25,41 @@ def get_pinnwire_tennis_odds():
 
         matches = data.get("events") or data.get("data") or data.get("markets") or []
 
-        # 🔍 ОТЛАДКА: показываем первый матч целиком
-        if matches:
-            st.write("**🔍 Отладка PinnWire — структура первого матча:**")
-            st.json(matches[0])
-
         events = []
         for match in matches:
             if not isinstance(match, dict):
                 continue
+
             home = match.get("home") or match.get("home_team") or match.get("player1")
             away = match.get("away") or match.get("away_team") or match.get("player2")
-            odds = match.get("odds") or match.get("prices") or {}
-            odds_home = odds.get("home") if isinstance(odds, dict) else None
-            odds_away = odds.get("away") if isinstance(odds, dict) else None
 
-            if home and away:
-                def clean_name(n):
-                    return str(n).replace("(Games)", "").replace("(games)", "").strip()
-                events.append({
-                    "home": clean_name(home),
-                    "away": clean_name(away),
-                    "start": match.get("start_time") or match.get("commence_time") or match.get("date") or "",
-                    "source": "PinnWire · Pinnacle",
-                    "odds_home": odds_home,
-                    "odds_away": odds_away,
-                    "match_id": match.get("id"),
-                })
+            if not home or not away:
+                continue
+
+            # Очистка имён
+            def clean_name(n):
+                return str(n).replace("(Games)", "").replace("(games)", "").strip()
+
+            # Ищем money_line в periods.num_0 (матч)
+            odds_home = None
+            odds_away = None
+            periods = match.get("periods") or {}
+            main_period = periods.get("num_0") or {}
+            money_line = main_period.get("money_line")
+            if isinstance(money_line, dict):
+                odds_home = money_line.get("home")
+                odds_away = money_line.get("away")
+
+            events.append({
+                "home": clean_name(home),
+                "away": clean_name(away),
+                "start": match.get("start_ts") or match.get("starts") or "",
+                "source": "PinnWire · Pinnacle" + (" · коэф. есть" if odds_home else " · коэф. нет"),
+                "odds_home": odds_home,
+                "odds_away": odds_away,
+                "match_id": match.get("event_id"),
+            })
+
         return events, None
     except Exception as e:
         return None, f"Ошибка PinnWire: {type(e).__name__} - {e}"
