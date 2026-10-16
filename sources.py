@@ -30,17 +30,19 @@ LIVETENNIS_BASE = "https://api.livetennisapi.com/v1"
 
 @st.cache_data(ttl=600)
 def get_tennis_events():
-    """Получает предстоящие теннисные матчи из Live Tennis API (v2)."""
+    """Получает предстоящие теннисные матчи из Live Tennis API."""
     try:
         api_key = st.secrets["LIVETENNIS_API_KEY"]
     except (KeyError, FileNotFoundError):
         return None, "Ключ Live Tennis API не настроен."
 
-    # Новый правильный URL с ключом в параметрах
-    url = f"https://live-tennis-api.com/api/v2/matches?api_key={api_key}"
+    # Возвращаемся к рабочему URL
+    url = "https://api.livetennisapi.com/api/public/v1/matches"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {"status": "upcoming"}
 
     try:
-        response = requests.get(url, timeout=TIMEOUT)
+        response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
 
@@ -72,7 +74,7 @@ def get_tennis_events():
             draw = match.get("draw", "")
             status = match.get("event_status") or "scheduled"
             has_market = match.get("has_market", False)
-            match_id = match.get("id")  # 👈 Сохраняем ID матча!
+            match_id = match.get("id")
 
             if status == "Finished":
                 continue
@@ -88,8 +90,8 @@ def get_tennis_events():
                 "source": f"Live Tennis API · {draw_label} · {market_label}",
                 "odds_home": None,
                 "odds_away": None,
-                "match_id": match_id,        # 👈 Добавляем в словарь
-                "has_market": has_market     # 👈 Полезный флаг
+                "match_id": match_id,
+                "has_market": has_market
             })
 
         if not events:
