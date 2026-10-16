@@ -1,18 +1,62 @@
-def predict(sport, event):
+from sources import find_elo_player
+
+def predict(sport, event, elo_dict=None):
     a = event.get("home", "Участник A")
     b = event.get("away", "Участник B")
     
-    try: oa = float(event.get("odds_home")) if event.get("odds_home") else None
-    except (TypeError, ValueError): oa = None
-    try: ob = float(event.get("odds_away")) if event.get("odds_away") else None
-    except (TypeError, ValueError): ob = None
+    # ===== Приоритет 1: Elo-модель =====
+    if elo_dict:
+        elo_a = find_elo_player(elo_dict, a)
+        elo_b = find_elo_player(elo_dict, b)
+        if elo_a and elo_b:
+            prob_a = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+            prob_b = 1 - prob_a
+            
+            if prob_a >= prob_b:
+                selection = f"Победа {a}"
+                probability = prob_a
+                fav = a
+                dog = b
+            else:
+                selection = f"Победа {b}"
+                probability = prob_b
+                fav = b
+                dog = a
+            
+            fair_odds = 1 / probability
+            explanation = (
+                f"Прогноз на основе Elo-рейтингов Tennis Abstract: "
+                f"{a} ({elo_a:.0f}) vs {b} ({elo_b:.0f}). "
+                f"Вероятность победы {fav} — {probability:.1%}, "
+                f"{dog} — {1-probability:.1%}."
+            )
+            confidence = "средняя — Elo-модель"
+            
+            return {
+                "selection": selection,
+                "probability": probability,
+                "odds": None,
+                "fair_odds": fair_odds,
+                "edge": None,
+                "explanation": explanation,
+                "confidence": confidence,
+            }
+    
+    # ===== Приоритет 2: Рыночные кэфы (fallback) =====
+    try:
+        oa = float(event.get("odds_home")) if event.get("odds_home") else None
+    except (TypeError, ValueError):
+        oa = None
+    try:
+        ob = float(event.get("odds_away")) if event.get("odds_away") else None
+    except (TypeError, ValueError):
+        ob = None
     
     if oa and ob and oa > 1 and ob > 1:
-        pa, pb = 1/oa, 1/ob
+        pa, pb = 1 / oa, 1 / ob
         market_a = pa / (pa + pb)
         market_b = 1 - market_a
         
-        # ВЫБИРАЕМ ФАВОРИТА — того, у кого рыночная вероятность выше
         if market_a >= market_b:
             selection = f"Победа {a}"
             p = max(.05, min(.95, 0.85 * market_a + 0.15 * 0.5))
@@ -45,7 +89,7 @@ def predict(sport, event):
         "selection": selection,
         "probability": p,
         "odds": odds,
-        "fair_odds": 1/p,
+        "fair_odds": 1 / p,
         "edge": edge,
         "explanation": explanation,
         "confidence": confidence,
