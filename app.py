@@ -113,9 +113,25 @@ if page == "Bet Better (ATP/WTA)":
                 else:
                     st.caption("⚠️ Матч не найден в Pinnacle — сравнить кэфы не удалось.")
 
-                if p.get("verdict"):
-                    with st.expander("Объяснение модели"):
-                        st.write(p["verdict"])
+                # Русское объяснение на основе данных модели
+                conf_text = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
+                prob = p.get("probability")
+                fair = p.get("fair_odds")
+                sel = p.get("selection", "")
+                game_date = format_time(p.get("game_time", ""))
+
+                explanation = (
+                    f"По оценке модели Bet Better на {game_date} исход "
+                    f"«{sel}» имеет вероятность {prob}%, что соответствует "
+                    f"справедливому коэффициенту {fair:.2f}. "
+                    f"Уверенность модели: {conf_text}."
+                )
+
+                with st.expander("Объяснение модели (на русском)"):
+                    st.write(explanation)
+                    if p.get("verdict"):
+                        st.caption("Оригинал от Bet Better:")
+                        st.caption(p["verdict"])
 
 elif page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
