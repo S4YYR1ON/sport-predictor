@@ -4,38 +4,75 @@ from st_supabase_connection import SupabaseConnection
 # Подключение к Supabase
 conn = st.connection("supabase", type=SupabaseConnection)
 
+
 def init_db():
-    # Таблица уже создана вручную в Supabase, поэтому здесь ничего не делаем
+    """Таблица создана вручную в Supabase, здесь ничего не делаем."""
     pass
+
 
 def save_prediction(sport, event, selection, probability, odds, explanation, confidence):
     data = {
-        "sport": sport, "event": event, "selection": selection,
-        "probability": probability, "odds": odds,
-        "explanation": explanation, "confidence": confidence
+        "sport": sport,
+        "event": event,
+        "selection": selection,
+        "probability": probability,
+        "odds": odds,
+        "explanation": explanation,
+        "confidence": confidence,
     }
     result = conn.table("predictions").insert(data).execute()
     return result.data[0]["id"] if result.data else None
 
+
 def list_predictions(limit=100):
-    result = conn.table("predictions").select("*").order("id", desc=True).limit(limit).execute()
-    return result.data
+    result = (
+        conn.table("predictions")
+        .select("*")
+        .order("id", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    data = result.data
+    if isinstance(data, dict):
+        return [data]
+    if not data:
+        return []
+    return data
+
 
 def settle_prediction(pid, result_status):
-    pred = conn.table("predictions").select("*").eq("id", pid).eq("status", "open").execute()
+    pred = (
+        conn.table("predictions")
+        .select("*")
+        .eq("id", pid)
+        .eq("status", "open")
+        .execute()
+    )
     if not pred.data:
         return False
     row = pred.data[0]
-    profit = (row["odds"] - 1) if result_status == "won" and row["odds"] else (-1 if result_status == "lost" else 0)
-    conn.table("predictions").update({"status": result_status, "profit": profit}).eq("id", pid).execute()
+    profit = (
+        (row["odds"] - 1)
+        if result_status == "won" and row["odds"]
+        else (-1 if result_status == "lost" else 0)
+    )
+    conn.table("predictions").update(
+        {"status": result_status, "profit": profit}
+    ).eq("id", pid).execute()
     return True
 
+
 def summary():
-    result = conn.table("predictions").select("status, profit").neq("status", "open").execute()
-    rows = result.data
+    result = (
+        conn.table("predictions")
+        .select("status, profit")
+        .neq("status", "open")
+        .execute()
+    )
+    rows = result.data or []
     return {
         "settled": len(rows),
         "won": sum(1 for r in rows if r["status"] == "won"),
         "lost": sum(1 for r in rows if r["status"] == "lost"),
-        "profit": sum(r["profit"] or 0 for r in rows)
+        "profit": sum(r["profit"] or 0 for r in rows),
     }
