@@ -551,7 +551,7 @@ def get_pinnapi_tennis_events():
         return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
 import pandas as pd
 
-@st.cache_data(ttl=86400)  # Кэш на 24 часа — Elo обновляется раз в неделю
+@st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
     """Скачивает актуальные Elo-рейтинги с Tennis Abstract."""
     if tour not in ("atp", "wta"):
@@ -561,13 +561,15 @@ def get_elo_ratings(tour="atp"):
     try:
         tables = pd.read_html(url)
         if not tables:
+            st.error("🔍 Elo: таблицы не найдены на странице")
             return {}, "Таблица Elo не найдена на странице."
         
-        df = tables[0]
-        # Приводим названия колонок к единому виду
-        df.columns = [str(c).strip() for c in df.columns]
+        st.write(f"🔍 Elo: загружено таблиц — {len(tables)}")
         
-        # Ищем нужные колонки (могут называться по-разному)
+        df = tables[0]
+        df.columns = [str(c).strip() for c in df.columns]
+        st.write(f"🔍 Elo: колонки — {list(df.columns)}")
+        
         player_col = None
         elo_col = None
         for col in df.columns:
@@ -578,17 +580,20 @@ def get_elo_ratings(tour="atp"):
                 elo_col = col
         
         if not player_col or not elo_col:
+            st.error(f"🔍 Elo: не найдены колонки Player/Elo")
             return {}, f"Не найдены колонки Player/Elo. Доступные: {list(df.columns)}"
         
         df[elo_col] = pd.to_numeric(df[elo_col], errors="coerce")
         df[player_col] = df[player_col].astype(str).str.strip()
-        
-        # Убираем строки с пустым Elo или именем
         df = df.dropna(subset=[elo_col, player_col])
         
         elo_dict = dict(zip(df[player_col], df[elo_col]))
+        st.write(f"🔍 Elo: загружено игроков — {len(elo_dict)}")
+        st.write(f"🔍 Elo: первые 3 примера — {list(elo_dict.items())[:3]}")
+        
         return elo_dict, None
     except Exception as e:
+        st.error(f"🔍 Elo: исключение — {type(e).__name__} - {e}")
         return {}, f"Ошибка загрузки Elo: {type(e).__name__} - {e}"
 
 def find_elo_player(elo_dict, player_name):
