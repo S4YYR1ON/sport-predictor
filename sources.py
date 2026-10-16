@@ -13,6 +13,12 @@ EUROPE_KEYWORDS = [
     "amsterdam", "brussels", "dublin", "europe"
 ]
 
+def is_european_league(league_name):
+    if not league_name:
+        return False
+    name_lower = league_name.lower()
+    return any(kw in name_lower for kw in EUROPE_KEYWORDS)
+    
 # Категории турниров, на которые BetBoom точно даёт линию
 TOP_TOUR_KEYWORDS = [
     "atp 250", "atp 500", "atp 1000", "atp masters", "atp finals",
@@ -272,16 +278,19 @@ def get_espn_events(sport):
     return events, warning
 
 # ========== Главная функция ==========
-def get_events(sport, region="all"):
+def get_events(sport, region="all", tour_filter="all"):
     if sport == "tennis":
         events, error = get_pinnapi_tennis_events()
         if events:
-            # Фильтр: только топ-турниры (ATP/WTA 250+ и ТБШ), где BetBoom даёт линию
-            if region == "top":
+            # Фильтр по регионам
+            if region == "europe":
+                events = [e for e in events if is_european_league(e.get("league_name", ""))]
+            # Фильтр по категории турнира
+            if tour_filter == "top":
                 events = [e for e in events if is_top_tournament(e.get("league_name", ""))]
             return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
         st.warning(f"Pinnapi недоступен: {error}. Пробую Bet Better.")
-        # ... резервный код Bet Better без изменений ...
+        # ... остальной резервный код без изменений ...
 
         # Резерв: Bet Better (только гандикапы)
         all_picks, bb_error = get_all_betbetter_picks()
