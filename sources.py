@@ -1,3 +1,24 @@
+EUROPE_KEYWORDS = [
+    "atp", "wta", "challenger", "itf",
+    "spain", "france", "italy", "germany", "uk", "england", "sweden",
+    "switzerland", "austria", "belgium", "netherlands", "portugal",
+    "greece", "turkey", "russia", "poland", "czech", "romania",
+    "hungary", "croatia", "serbia", "bulgaria", "denmark", "norway",
+    "finland", "ireland", "scotland", "wales", "monaco",
+    "mallorca", "paris", "london", "rome", "madrid", "barcelona",
+    "berlin", "hamburg", "munich", "vienna", "geneva", "zurich",
+    "basel", "stockholm", "copenhagen", "oslo", "helsinki",
+    "prague", "warsaw", "budapest", "bucharest", "sofia",
+    "zagreb", "belgrade", "istanbul", "athens", "lisbon",
+    "amsterdam", "brussels", "dublin", "europe"
+]
+
+def is_european_league(league_name):
+    """Проверяет, относится ли турнир к Европе по названию лиги."""
+    if not league_name:
+        return False
+    name_lower = league_name.lower()
+    return any(kw in name_lower for kw in EUROPE_KEYWORDS)
 import betbetter
 import requests
 import streamlit as st
@@ -231,6 +252,7 @@ def get_espn_events(sport):
                     "source": f"ESPN · {label}",
                     "odds_home": None,
                     "odds_away": None,
+                    "league_name": ev.get("league_name", ""),
                 })
         except Exception as e:
             errors.append(f"{label}: {type(e).__name__}")
@@ -238,13 +260,15 @@ def get_espn_events(sport):
     return events, warning
 
 # ========== Главная функция ==========
-def get_events(sport):
+def get_events(sport, region="all"):
     if sport == "tennis":
-        # Pinnapi — реальные коэффициенты Moneyline от Pinnacle
         events, error = get_pinnapi_tennis_events()
         if events:
+            if region == "europe":
+                events = [e for e in events if is_european_league(e.get("league_name", ""))]
             return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
         st.warning(f"Pinnapi недоступен: {error}. Пробую Bet Better.")
+        # ... резервный код Bet Better без изменений ...
 
         # Резерв: Bet Better (только гандикапы)
         all_picks, bb_error = get_all_betbetter_picks()
