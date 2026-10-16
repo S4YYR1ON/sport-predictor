@@ -85,15 +85,21 @@ if page == "Bet Better (ATP/WTA)":
             with st.container(border=True):
                 st.markdown(f"**{p['home']} — {p['away']}**")
                 st.caption(f"🏆 {p['tour']} · Начало: {format_time(p.get('game_time', ''))}")
-                st.caption(f"Рынок: {p.get('market', '')}")
-
-                a, b, c = st.columns(3)
-                a.metric("Прогноз модели", p.get("selection", ""))
-                b.metric("Вероятность", f"{p['probability']}%" if p.get("probability") is not None else "—")
-                c.metric("Справедливый кэф", f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—")
-
-                conf_ru = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
-                st.caption(f"Уверенность модели: **{conf_ru}**")
+                
+                # Понятное объяснение прогноза
+                sel = p.get("selection", "")
+                if "handicap" in sel.lower():
+                    # Извлекаем имя игрока и число
+                    import re
+                    m = re.search(r"([-+]?\d+\.?\d*)\s*games", sel)
+                    line = m.group(1) if m else "?"
+                    player = sel.split("-")[0].strip() if "-" in sel else sel.split()[0]
+                    st.info(f"📌 **Что значит прогноз:** {player} должен выиграть матч "
+                            f"с разницей в геймах больше {line}. То есть, например, 6:2, 6:3 "
+                            f"(разница +7) — зайдёт. А 6:4, 7:6 (разница +3) — не зайдёт.")
+                    st.caption(f"Рынок: {p.get('market', '')} · Полная формулировка: {sel}")
+                else:
+                    st.caption(f"Рынок: {p.get('market', '')} · Прогноз: {sel}")
 
                 # Коэффициент Pinnacle и value
                 if p.get("match_found"):
