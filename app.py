@@ -48,7 +48,6 @@ if page == "Матчи и прогнозы":
                     with col1:
                         if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
                             with st.spinner("Анализирую и сохраняю..."):
-                                # Пытаемся получить коэффициенты, если есть match_id
                                 odds_home, odds_away = None, None
                                 odds_error = None
                                 
@@ -57,7 +56,6 @@ if page == "Матчи и прогнозы":
                                     if odds_result:
                                         odds_home = odds_result.get("home")
                                         odds_away = odds_result.get("away")
-                                        # Подставляем в событие, чтобы predict их использовал
                                         e["odds_home"] = odds_home
                                         e["odds_away"] = odds_away
                                 
