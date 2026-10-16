@@ -576,40 +576,18 @@ def get_elo_ratings(tour="atp"):
 
         st.write(f"🔍 Elo: всего таблиц — {len(tables)}")
         
-        df = tables[0]
-        st.write(f"🔍 Elo: тип колонок — {type(df.columns).__name__}")
-        st.write(f"🔍 Elo: колонки — {list(df.columns)}")
-        st.write(f"🔍 Elo: первые 3 строки:")
-        st.dataframe(df.head(3))
+        # Показываем структуру каждой таблицы
+        for i, tbl in enumerate(tables):
+            st.write(f"--- Таблица {i} ---")
+            st.write(f"Размер: {tbl.shape}")
+            st.write(f"Колонки: {list(tbl.columns)}")
+            st.dataframe(tbl.head(3))
         
         return {}, "Отладка: смотри вывод выше."
         
     except Exception as e:
         st.error(f"🔍 Elo: исключение — {type(e).__name__} - {e}")
         return {}, f"Ошибка Elo: {type(e).__name__} - {e}"
-
-def find_elo_player(elo_dict, player_name):
-    """Ищет игрока в словаре Elo по фамилии (Tennis Abstract использует полные имена)."""
-    if not player_name or not elo_dict:
-        return None
-    
-    # 1. Точное совпадение
-    if player_name in elo_dict:
-        return elo_dict[player_name]
-    
-    # 2. Поиск по фамилии (последнее слово в имени)
-    parts = player_name.strip().split()
-    if not parts:
-        return None
-    last_name = parts[-1].lower()
-    
-    # 3. Ищем, чтобы фамилия содержалась в имени игрока из базы
-    for key, val in elo_dict.items():
-        key_lower = key.lower()
-        if last_name in key_lower:
-            return val
-    
-    return None
     
 def source_status():
     out = {}
