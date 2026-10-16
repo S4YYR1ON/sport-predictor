@@ -1,3 +1,54 @@
+# Словарь известных турниров и их покрытий
+TOURNAMENT_SURFACE = {
+    # Grand Slam
+    "australian open": "hard",
+    "roland garros": "clay",
+    "french open": "clay",
+    "wimbledon": "grass",
+    "us open": "hard",
+    # ATP Masters
+    "indian wells": "hard",
+    "miami": "hard",
+    "monte carlo": "clay",
+    "madrid": "clay",
+    "rome": "clay",
+    "canada": "hard",
+    "cincinnati": "hard",
+    "shanghai": "hard",
+    "paris masters": "hard",
+    # ATP 500
+    "vienna": "hard",
+    "basel": "hard",
+    "halle": "grass",
+    "queens": "grass",
+    "barcelona": "clay",
+    "hamburg": "clay",
+    "tokyo": "hard",
+    "beijing": "hard",
+    "dubai": "hard",
+    "acapulco": "hard",
+    "rio": "clay",
+    # WTA
+    "doha": "hard",
+    "miami open": "hard",
+    "charleston": "clay",
+    "stuttgart": "clay",
+    "eastbourne": "grass",
+    "berlin": "grass",
+    "wuhan": "hard",
+    "guadalajara": "hard",
+}
+
+def get_surface(league_name):
+    """Определяет покрытие по названию турнира."""
+    if not league_name:
+        return "hard"  # по умолчанию — хард, самый частый
+    name_lower = league_name.lower()
+    for keyword, surface in TOURNAMENT_SURFACE.items():
+        if keyword in name_lower:
+            return surface
+    return "hard"  # если не нашли — считаем хард
+    
 EUROPE_KEYWORDS = [
     "atp", "wta", "challenger", "itf",
     "spain", "france", "italy", "germany", "uk", "england", "sweden",
