@@ -28,7 +28,7 @@ TOP_TOUR_KEYWORDS = [
 ]
 
 def is_top_tournament(league_name):
-    """Проверяет, относится ли турнир к ATP/WTA 250+ или ТБШ."""
+    """Проверяет, относится ли турнир к ATP/WTA (кроме Challenger/ITF)."""
     if not league_name:
         return False
     name_lower = league_name.lower()
@@ -38,6 +38,9 @@ def is_top_tournament(league_name):
                "m15", "m25", "wta 125", "atp 125", "125k", "doubles"]
     if any(word in name_lower for word in exclude):
         return False
+    
+    # Оставляем всё, где есть ATP или WTA (основные туры)
+    return "atp" in name_lower or "wta" in name_lower
     
     # Оставляем только то, где явно указан ATP/WTA 250+ или ТБШ
     include = [
