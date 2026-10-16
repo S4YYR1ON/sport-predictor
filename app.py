@@ -225,7 +225,7 @@ elif page == "Матчи и прогнозы":
             for i, e in enumerate(events):
                 with st.container(border=True):
                     st.markdown(f"**{e['home']} — {e['away']}**")
-                    st.caption(f"Начало: {e.get('start','неизвестно')} · Источник: {e.get('source','не указан')}")
+                    st.caption(f"Начало: {format_time(e.get('start', ''))} · Источник: {e.get('source', 'не указан')}")
                         
                     col1,col2=st.columns([1,3])
                     with col1:
