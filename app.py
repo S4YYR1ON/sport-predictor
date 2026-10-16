@@ -18,11 +18,44 @@ st.caption("Личная спортивная аналитика · прогно
 
 with st.sidebar:
     st.header("Навигация")
-    page = st.radio("Раздел", ["Матчи и прогнозы", "Добавить матч вручную", "История прогнозов", "Виртуальный баланс", "Источники данных"])
+    page = st.radio("Раздел", ["Матчи и прогнозы", "Bet Better (ATP/WTA)", "Добавить матч вручную", "История прогнозов", "Виртуальный баланс", "Источники данных"])
     st.divider()
     st.caption("MVP: прогнозы экспериментальные. Никаких гарантий выигрыша.")
-
-if page == "Матчи и прогнозы":
+if page == "Bet Better (ATP/WTA)":
+    st.subheader("📊 Прогнозы модели Bet Better")
+    st.caption("Независимая статистическая модель для тенниса ATP и WTA. Вероятности и fair odds — не коэффициенты букмекеров.")
+    
+    if st.button("Загрузить прогнозы", type="primary"):
+        with st.spinner("Загружаю прогнозы модели…"):
+            from sources import get_all_betbetter_picks
+            picks, error = get_all_betbetter_picks()
+            st.session_state["bb_picks"] = picks
+            st.session_state["bb_error"] = error
+    
+    if st.session_state.get("bb_error"):
+        st.warning(st.session_state["bb_error"])
+    
+    picks = st.session_state.get("bb_picks", [])
+    if not picks:
+        st.info("Нажми «Загрузить прогнозы», чтобы получить список матчей.")
+    else:
+        st.success(f"Найдено прогнозов: {len(picks)}")
+        for i, p in enumerate(picks):
+            with st.container(border=True):
+                st.markdown(f"**{p['home']} — {p['away']}**")
+                st.caption(f"🏆 {p['tour']} · Начало: {p.get('game_time', 'неизвестно')}")
+                st.caption(f"Рынок: {p.get('market', '')}")
+                
+                a, b, c = st.columns(3)
+                a.metric("Прогноз модели", p.get("selection", ""))
+                b.metric("Вероятность", f"{p['probability']}%" if p.get("probability") is not None else "—")
+                c.metric("Fair odds", f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—")
+                
+                if p.get("confidence"):
+                    st.caption(f"Уверенность модели: **{p['confidence']}**")
+                if p.get("verdict"):
+                    st.write(p["verdict"])
+elif page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
     st.subheader(sport_label)
