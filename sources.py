@@ -64,8 +64,8 @@ def get_pinnwire_tennis_odds():
                     odds_away = spread.get("away")
 
             # Данные модели Bet Better
-            bb_home = model_data.get(home_clean.lower())
-            bb_away = model_data.get(away_clean.lower())
+            bb_home = find_bb_data(model_data, home_clean)
+            bb_away = find_bb_data(model_data, away_clean)
 
             events.append({
                 "home": home_clean,
@@ -91,31 +91,70 @@ def get_pinnwire_tennis_odds():
 # ===================
 @st.cache_data(ttl=600)
 def get_betbetter_tennis_picks():
-    """Получает вероятности и fair odds от модели Bet Better для тенниса."""
+    """Получает вероятности и fair odds от модели Bet Better для тенниса (ATP + WTA)."""
+    model_data = {}
     try:
-        feed = betbetter.get_picks("tennis/atp")
-        picks = feed.get("picks", [])
-        st.write("**🔍 Отладка Bet Better — первые 3 прогноза:**")
-        st.json(picks[:3] if picks else "Пусто")
-        # Строим словарь: ключ — имя игрока, значение — данные модели
-        model_data = {}
-        for p in picks:
-            game = p.get("game", "")
-            selection = p.get("selection", "")
-            prob = p.get("modelProbabilityPct")
-            fair_odds = p.get("fairOdds")
-            confidence = p.get("confidence", "")
-            if selection:
-                model_data[selection.lower()] = {
-                    "probability": prob,
-                    "fair_odds": fair_odds,
-                    "confidence": confidence,
-                    "game": game
-                }
+        for tour in ["tennis/atp", "tennis/wta"]:
+            try:
+                feed = betbetter.get_picks(tour)
+            except Exception:
+                continue
+            picks = feed.get("picks", [])
+            for p in picks:
+                if p.get("locked"):
+                    continue
+                game = p.get("game", "")
+                selection = (p.get("selection") or "").strip()
+                if not game or not selection or " @ " not in game:
+                    continue
+
+                home, away = game.split(" @ ", 1)
+                home = home.strip()
+                away = away.strip()
+
+                prob = p.get("modelProbabilityPct")
+                fair_odds = p.get("fairOdds")
+                confidence = p.get("confidence", "")
+                market = p.get("market", "")
+
+                sel_lower = selection.lower()
+                player_key = None
+                if sel_lower.startswith(home.lower()):
+                    player_key = home.lower()
+                elif sel_lower.startswith(away.lower()):
+                    player_key = away.lower()
+
+                if player_key:
+                    existing = model_data.get(player_key)
+                    # Moneyline приоритетнее, чем Handicap
+                    if not existing or market == "Moneyline":
+                        model_data[player_key] = {
+                            "probability": prob,
+                            "fair_odds": fair_odds,
+                            "confidence": confidence,
+                            "market": market,
+                        }
         return model_data, None
     except Exception as e:
         return {}, f"Ошибка Bet Better: {type(e).__name__} - {e}"
-        
+
+# ====================
+def find_bb_data(model_data, player_name):
+    """Ищет данные Bet Better по имени игрока (нечёткое совпадение по фамилии)."""
+    if not player_name or not model_data:
+        return None
+    name_lower = player_name.strip().lower()
+    if name_lower in model_data:
+        return model_data[name_lower]
+    # Поиск по фамилии (последнее слово)
+    parts = name_lower.split()
+    if parts:
+        last_name = parts[-1]
+        for key, val in model_data.items():
+            if last_name in key:
+                return val
+    return None
+    
 # ========== Live Tennis API (резерв без коэффициентов) ==========
 LIVETENNIS_BASE = "https://api.livetennisapi.com/api/public/v1"
 
