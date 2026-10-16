@@ -138,12 +138,22 @@ if page == "Bet Better (ATP/WTA)":
 
                 # === Русское объяснение модели ===
                 game_date = format_time(p.get("game_time", ""))
-                explanation = (
-                    f"По оценке модели Bet Better на {game_date} исход "
-                    f"«{sel}» имеет вероятность {p['probability']}%, что соответствует "
-                    f"справедливому коэффициенту {p['fair_odds']:.2f}. "
-                    f"Уверенность модели: {conf_ru}."
-                )
+                if p.get("locked"):
+                    explanation = (
+                        f"Прогноз Moneyline (чистая победа) по этому матчу "
+                        f"будет открыт Bet Better в момент начала матча "
+                        f"({game_date}). До этого момента модель не публикует "
+                        f"вероятность и справедливый коэффициент для этого исхода."
+                    )
+                else:
+                    fair_str = f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—"
+                    prob_str = f"{p['probability']}%" if p.get("probability") is not None else "—"
+                    explanation = (
+                        f"По оценке модели Bet Better на {game_date} исход "
+                        f"«{sel}» имеет вероятность {prob_str}, что соответствует "
+                        f"справедливому коэффициенту {fair_str}. "
+                        f"Уверенность модели: {conf_ru}."
+                    )
                 with st.expander("Объяснение модели (на русском)"):
                     st.write(explanation)
                     if p.get("verdict"):
