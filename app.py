@@ -291,6 +291,8 @@ elif page == "Матчи и прогнозы":
                                     rh = match_stats["home"].get("rest")
                                     if rh is not None:
                                         st.write(f"Отдых: **{rh} дн.**")
+                                        if rh > 30:
+                                            st.caption(f"⚠️ Данные в базе устаревшие — последний матч более месяца назад.")
                                 with col_a:
                                     st.markdown(f"**{e['away']}**")
                                     fa = match_stats["away"].get("form") or {}
