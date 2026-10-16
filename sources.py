@@ -36,33 +36,61 @@ def get_tennis_events():
     except (KeyError, FileNotFoundError):
         return None, "Ключ Live Tennis API не настроен."
 
-    # ✅ Правильный URL из документации
     url = "https://api.livetennisapi.com/api/public/v1/matches"
-    # ✅ Ключ можно передать и в заголовке, и в параметре. Заголовок надёжнее.
     headers = {"Authorization": f"Bearer {api_key}"}
-    # ✅ Используем параметр status=upcoming, чтобы получить будущие матчи
     params = {"status": "upcoming"}
 
     try:
         response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
-        
-        # ✅ Структура ответа может быть вложенной. Ищем список матчей.
-        matches_list = data.get("matches", []) or data.get("data", [])
-        
+
+        # Ищем список матчей на разных уровнях вложенности
+        matches_list = (
+            data.get("matches") or
+            data.get("data", {}).get("matches") or
+            data.get("data") or
+            (data if isinstance(data, list) else [])
+        )
+
+        if not matches_list:
+            # Если матчей нет, но ответ пришёл — показываем структуру для отладки
+            return [], f"Ответ получен, но матчи не найдены. Структура ответа: {str(data)[:500]}"
+
         events = []
         for match in matches_list:
-            # ✅ Исправляем названия полей в соответствии с документацией
+            # Пробуем разные варианты полей для имён игроков
+            home = (
+                match.get("player1", {}).get("name") if isinstance(match.get("player1"), dict) else match.get("player1") or
+                match.get("home_player", {}).get("name") if isinstance(match.get("home_player"), dict) else match.get("home_player") or
+                match.get("player_home", {}).get("name") if isinstance(match.get("player_home"), dict) else match.get("player_home") or
+                match.get("home", {}).get("name") if isinstance(match.get("home"), dict) else match.get("home")
+            )
+            away = (
+                match.get("player2", {}).get("name") if isinstance(match.get("player2"), dict) else match.get("player2") or
+                match.get("away_player", {}).get("name") if isinstance(match.get("away_player"), dict) else match.get("away_player") or
+                match.get("player_away", {}).get("name") if isinstance(match.get("player_away"), dict) else match.get("player_away") or
+                match.get("away", {}).get("name") if isinstance(match.get("away"), dict) else match.get("away")
+            )
+
+            if not home or not away:
+                # Если имена не нашлись, показываем структуру одного матча для отладки
+                st.warning(f"⚠️ Не удалось распознать имена игроков. Структура матча: {str(match)[:500]}")
+                continue
+
             events.append({
-                "home": match.get("player1", {}).get("name", "Unknown"),
-                "away": match.get("player2", {}).get("name", "Unknown"),
-                "start": match.get("start_time", ""),
+                "home": home,
+                "away": away,
+                "start": match.get("start_time") or match.get("date") or match.get("start") or "",
                 "source": "Live Tennis API",
                 "odds_home": None,
                 "odds_away": None
             })
-        return events, None
+
+        if not events:
+            return [], "Матчи получены, но имена игроков не распознаны. Смотри предупреждение выше."
+
+        return events, "Источник: Live Tennis API."
     except Exception as e:
         return None, f"Ошибка Live Tennis API: {type(e).__name__} - {e}"
 
