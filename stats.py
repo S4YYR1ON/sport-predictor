@@ -95,7 +95,6 @@ def get_h2h(df, player_a, player_b):
 
 def get_rest_days(df, player_name, before_date=None):
     player_matches = _find_player_matches(df, player_name)
-    st.write(past["tourney_date"].max())
     if player_matches.empty:
         return None
     if before_date:
