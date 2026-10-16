@@ -507,6 +507,7 @@ def get_pinnapi_tennis_events():
                 "odds_home": odds_home,
                 "odds_away": odds_away,
                 "match_id": ev.get("event_id"),
+                "league_name": ev.get("league_name", ""),
             })
 
         return events, f"Pinnapi: найдено матчей {len(events)}."
