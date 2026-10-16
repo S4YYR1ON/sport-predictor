@@ -45,6 +45,7 @@ if page == "Матчи и прогнозы":
                     st.markdown(f"**{e['home']} — {e['away']}**")
                     st.caption(f"Начало: {e.get('start','неизвестно')} · Источник: {e.get('source','не указан')}")
                     
+                    # Bet Better
                     if e.get("bb_home_prob") or e.get("bb_away_prob"):
                         st.caption("📊 **Модель Bet Better:**")
                         col_a, col_b = st.columns(2)
@@ -58,8 +59,10 @@ if page == "Матчи и прогнозы":
                                 st.metric(f"Вероятность {e['away']}", f"{e['bb_away_prob']}%", 
                                          f"fair odds {e['bb_away_fair']}")
                                 st.caption(f"Уверенность: {e['bb_away_conf']}")
+                    else:
+                        st.caption("📊 *Bet Better: матч не найден в базе модели*")
+                        
                     col1,col2=st.columns([1,3])
-                    
                     with col1:
                         if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
                             with st.spinner("Анализирую и сохраняю..."):
