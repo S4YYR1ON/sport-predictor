@@ -34,13 +34,17 @@ def predict(sport, event, elo_dict=None, surface="hard"):
         elo_a = find_elo_player(elo_dict, a)
         elo_b = find_elo_player(elo_dict, b)
         if elo_a and elo_b:
-            surface_key = {"hard": "hElo", "clay": "cElo", "grass": "gElo"}.get(surface, "elo")
+            surface_key = {
+                "hard": "hElo",
+                "clay": "cElo",
+                "grass": "gElo",
+            }.get(surface, "elo")
             elo_a_val = elo_a.get(surface_key) if isinstance(elo_a, dict) else elo_a
             elo_b_val = elo_b.get(surface_key) if isinstance(elo_b, dict) else elo_b
+
             if not elo_a_val or not elo_b_val or pd.isna(elo_a_val) or pd.isna(elo_b_val):
                 elo_a_val = elo_a.get("elo") if isinstance(elo_a, dict) else elo_a
                 elo_b_val = elo_b.get("elo") if isinstance(elo_b, dict) else elo_b
-                surface_key = "elo"
 
             if elo_a_val and elo_b_val:
                 prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
@@ -65,14 +69,16 @@ def predict(sport, event, elo_dict=None, surface="hard"):
                     dog = a
 
                 fair_odds = 1 / probability
-                surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(surface, "хард")
+                surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(
+                    surface, "хард"
+                )
 
                 explanation = (
                     f"Прогноз на основе Elo-рейтингов Tennis Abstract ({surface_ru}) "
                     f"с калибровочной поправкой. "
                     f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
                     f"Вероятность победы {fav} — {probability:.1%}, "
-                    f"{dog} — {1-probability:.1%}."
+                    f"{dog} — {1 - probability:.1%}."
                 )
                 confidence = f"средняя — Elo-модель + калибровка ({surface_ru})"
 
@@ -86,7 +92,7 @@ def predict(sport, event, elo_dict=None, surface="hard"):
                     "confidence": confidence,
                 }
 
-    # ===== Приоритет 2: Рыночные кэфы (fallback) =====
+    # ===== Приоритет 2: Рыночные кэфы =====
     try:
         oa = float(event.get("odds_home")) if event.get("odds_home") else None
     except (TypeError, ValueError):
@@ -103,12 +109,12 @@ def predict(sport, event, elo_dict=None, surface="hard"):
 
         if market_a >= market_b:
             selection = f"Победа {a}"
-            p = max(.05, min(.95, 0.85 * market_a + 0.15 * 0.5))
+            p = max(0.05, min(0.95, 0.85 * market_a + 0.15 * 0.5))
             odds = oa
             market_fav = market_a
         else:
             selection = f"Победа {b}"
-            p = max(.05, min(.95, 0.85 * market_b + 0.15 * 0.5))
+            p = max(0.05, min(0.95, 0.85 * market_b + 0.15 * 0.5))
             odds = ob
             market_fav = market_b
 
