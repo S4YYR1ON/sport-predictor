@@ -264,7 +264,7 @@ elif page == "Матчи и прогнозы":
                                 elo_dict, _ = get_elo_ratings(tour=tour_key)
                                 
                                 # Если игрок не найден в основном туре — пробуем другой тур
-                                from sources import find_elo_player
+                                from predictor import find_elo_player
                                 if not (find_elo_player(elo_dict, e.get("home", "")) and find_elo_player(elo_dict, e.get("away", ""))):
                                     alt_tour = "wta" if tour_key == "atp" else "atp"
                                     alt_elo, _ = get_elo_ratings(tour=alt_tour)
