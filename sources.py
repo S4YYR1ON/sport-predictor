@@ -570,25 +570,19 @@ def get_elo_ratings(tour="atp"):
         from io import StringIO
         tables = pd.read_html(StringIO(response.text))
 
-        # Настоящие рейтинги — во второй таблице (индекс 1)
         if len(tables) < 2:
             return {}, "Не найдена таблица с рейтингами."
 
         df = tables[1].copy()
-
-        # Нормализуем имена колонок (убираем \xa0 — неразрывные пробелы)
         df.columns = [str(c).replace("\xa0", " ").strip() for c in df.columns]
 
-        # Проверяем наличие нужных колонок
         if "Player" not in df.columns or "Elo" not in df.columns:
             return {}, f"Не найдены колонки Player/Elo. Есть: {list(df.columns)}"
 
-        # Преобразуем Elo в числа
         df["Elo"] = pd.to_numeric(df["Elo"], errors="coerce")
         df["Player"] = df["Player"].astype(str).str.strip()
         df = df.dropna(subset=["Elo", "Player"])
 
-        # Создаём словарь: {имя: {"elo": ..., "hElo": ..., "cElo": ..., "gElo": ...}}
         elo_dict = {}
         for _, row in df.iterrows():
             elo_dict[row["Player"]] = {
