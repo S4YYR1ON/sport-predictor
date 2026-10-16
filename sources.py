@@ -271,7 +271,7 @@ def get_events(sport):
     return [], "Нет доступных матчей."
     
 def get_all_betbetter_picks():
-    """Получает все прогнозы Bet Better, включая Moneyline (Head to Head)."""
+    """Получает прогнозы Bet Better для тенниса (ATP + WTA)."""
     all_picks = []
     errors = []
     for tour, label in [("tennis/atp", "ATP"), ("tennis/wta", "WTA")]:
@@ -279,15 +279,29 @@ def get_all_betbetter_picks():
             feed = betbetter.get_picks(tour)
             picks = feed.get("picks", [])
             for p in picks:
-                # Пропускаем заблокированные прогнозы
-                if p.get("locked"):
-                    continue
-                
-                # Нас интересует только рынок "Head to Head" (чистая победа)
-                if p.get("market") != "Head to Head":
-                    continue
-                
                 game = p.get("game", "")
+                market = p.get("market", "")
+                locked = p.get("locked", False)
+                
+                # Для заблокированных Moneyline — сохраняем как отдельную запись
+                if locked:
+                    if market == "Moneyline" and " @ " in game:
+                        home, away = game.split(" @ ", 1)
+                        all_picks.append({
+                            "tour": label,
+                            "home": home.strip(),
+                            "away": away.strip(),
+                            "game_time": p.get("gameTimeUtc", ""),
+                            "market": "Moneyline (заблокировано)",
+                            "selection": "Откроется в момент начала матча",
+                            "probability": None,
+                            "fair_odds": None,
+                            "confidence": "LOCKED",
+                            "verdict": "",
+                            "locked": True,
+                        })
+                    continue
+                
                 selection = (p.get("selection") or "").strip()
                 if not game or not selection or " @ " not in game:
                     continue
@@ -298,12 +312,13 @@ def get_all_betbetter_picks():
                     "home": home.strip(),
                     "away": away.strip(),
                     "game_time": p.get("gameTimeUtc", ""),
-                    "market": "Moneyline (П1/П2)",
+                    "market": market,
                     "selection": selection,
                     "probability": p.get("modelProbabilityPct"),
                     "fair_odds": p.get("fairOdds"),
                     "confidence": p.get("confidence", ""),
                     "verdict": p.get("verdict", ""),
+                    "locked": False,
                 })
         except Exception as e:
             errors.append(f"{label}: {type(e).__name__}")
