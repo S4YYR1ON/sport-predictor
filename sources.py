@@ -45,37 +45,48 @@ def get_tennis_events():
         response.raise_for_status()
         data = response.json()
 
-        # Ищем список матчей на разных уровнях вложенности
-        matches_list = (
-            data.get("matches") or
-            data.get("data", {}).get("matches") or
-            data.get("data") or
-            (data if isinstance(data, list) else [])
-        )
+        # Определяем, где находится список матчей
+        if isinstance(data, list):
+            matches_list = data
+        elif isinstance(data, dict):
+            matches_list = data.get("matches") or data.get("data") or []
+            if isinstance(matches_list, dict):
+                matches_list = matches_list.get("matches", [])
+        else:
+            matches_list = []
 
         if not matches_list:
-            # Если матчей нет, но ответ пришёл — показываем структуру для отладки
-            return [], f"Ответ получен, но матчи не найдены. Структура ответа: {str(data)[:500]}"
+            return [], f"Ответ получен, но матчи не найдены. Первые 500 символов: {str(data)[:500]}"
 
         events = []
         for match in matches_list:
-            # Пробуем разные варианты полей для имён игроков
+            if not isinstance(match, dict):
+                continue
+
+            # Извлекаем имена игроков, пробуя разные варианты
+            def extract_name(obj):
+                if isinstance(obj, dict):
+                    return obj.get("name") or obj.get("player") or obj.get("full_name")
+                return str(obj) if obj else None
+
             home = (
-                match.get("player1", {}).get("name") if isinstance(match.get("player1"), dict) else match.get("player1") or
-                match.get("home_player", {}).get("name") if isinstance(match.get("home_player"), dict) else match.get("home_player") or
-                match.get("player_home", {}).get("name") if isinstance(match.get("player_home"), dict) else match.get("player_home") or
-                match.get("home", {}).get("name") if isinstance(match.get("home"), dict) else match.get("home")
+                extract_name(match.get("player1")) or
+                extract_name(match.get("home_player")) or
+                extract_name(match.get("player_home")) or
+                extract_name(match.get("home")) or
+                extract_name(match.get("player1_name"))
             )
             away = (
-                match.get("player2", {}).get("name") if isinstance(match.get("player2"), dict) else match.get("player2") or
-                match.get("away_player", {}).get("name") if isinstance(match.get("away_player"), dict) else match.get("away_player") or
-                match.get("player_away", {}).get("name") if isinstance(match.get("player_away"), dict) else match.get("player_away") or
-                match.get("away", {}).get("name") if isinstance(match.get("away"), dict) else match.get("away")
+                extract_name(match.get("player2")) or
+                extract_name(match.get("away_player")) or
+                extract_name(match.get("player_away")) or
+                extract_name(match.get("away")) or
+                extract_name(match.get("player2_name"))
             )
 
             if not home or not away:
-                # Если имена не нашлись, показываем структуру одного матча для отладки
-                st.warning(f"⚠️ Не удалось распознать имена игроков. Структура матча: {str(match)[:500]}")
+                # Показываем структуру одного матча для отладки
+                st.warning(f"⚠️ Не удалось распознать имена. Структура матча: {str(match)[:600]}")
                 continue
 
             events.append({
