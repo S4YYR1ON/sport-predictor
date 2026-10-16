@@ -22,40 +22,42 @@ def predict(sport, event, elo_dict=None):
         elo_a = find_elo_player(elo_dict, a)
         elo_b = find_elo_player(elo_dict, b)
         if elo_a and elo_b:
-            elo_a_val = elo_a.get("elo")
-            elo_b_val = elo_b.get("elo")
-            prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
-            prob_b = 1 - prob_a
+            elo_a_val = elo_a.get("elo") if isinstance(elo_a, dict) else elo_a
+            elo_b_val = elo_b.get("elo") if isinstance(elo_b, dict) else elo_b
             
-            if prob_a >= prob_b:
-                selection = f"Победа {a}"
-                probability = prob_a
-                fav = a
-                dog = b
-            else:
-                selection = f"Победа {b}"
-                probability = prob_b
-                fav = b
-                dog = a
-            
-            fair_odds = 1 / probability
-            explanation = (
-                f"Прогноз на основе Elo-рейтингов Tennis Abstract: "
-                f"{a} ({elo_a:.0f}) vs {b} ({elo_b:.0f}). "
-                f"Вероятность победы {fav} — {probability:.1%}, "
-                f"{dog} — {1-probability:.1%}."
-            )
-            confidence = "средняя — Elo-модель"
-            
-            return {
-                "selection": selection,
-                "probability": probability,
-                "odds": None,
-                "fair_odds": fair_odds,
-                "edge": None,
-                "explanation": explanation,
-                "confidence": confidence,
-            }
+            if elo_a_val and elo_b_val:
+                prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
+                prob_b = 1 - prob_a
+                
+                if prob_a >= prob_b:
+                    selection = f"Победа {a}"
+                    probability = prob_a
+                    fav = a
+                    dog = b
+                else:
+                    selection = f"Победа {b}"
+                    probability = prob_b
+                    fav = b
+                    dog = a
+                
+                fair_odds = 1 / probability
+                explanation = (
+                    f"Прогноз на основе Elo-рейтингов Tennis Abstract: "
+                    f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
+                    f"Вероятность победы {fav} — {probability:.1%}, "
+                    f"{dog} — {1-probability:.1%}."
+                )
+                confidence = "средняя — Elo-модель"
+                
+                return {
+                    "selection": selection,
+                    "probability": probability,
+                    "odds": None,
+                    "fair_odds": fair_odds,
+                    "edge": None,
+                    "explanation": explanation,
+                    "confidence": confidence,
+                }
     
     # ===== Приоритет 2: Рыночные кэфы (fallback) =====
     try:
