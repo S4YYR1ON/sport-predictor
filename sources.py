@@ -271,7 +271,7 @@ def get_events(sport):
     return [], "Нет доступных матчей."
     
 def get_all_betbetter_picks():
-    """Получает все прогнозы Bet Better для тенниса (ATP + WTA)."""
+    """Получает все прогнозы Bet Better, включая Moneyline (Head to Head)."""
     all_picks = []
     errors = []
     for tour, label in [("tennis/atp", "ATP"), ("tennis/wta", "WTA")]:
@@ -279,19 +279,26 @@ def get_all_betbetter_picks():
             feed = betbetter.get_picks(tour)
             picks = feed.get("picks", [])
             for p in picks:
+                # Пропускаем заблокированные прогнозы
                 if p.get("locked"):
                     continue
+                
+                # Нас интересует только рынок "Head to Head" (чистая победа)
+                if p.get("market") != "Head to Head":
+                    continue
+                
                 game = p.get("game", "")
                 selection = (p.get("selection") or "").strip()
                 if not game or not selection or " @ " not in game:
                     continue
+                
                 home, away = game.split(" @ ", 1)
                 all_picks.append({
                     "tour": label,
                     "home": home.strip(),
                     "away": away.strip(),
                     "game_time": p.get("gameTimeUtc", ""),
-                    "market": p.get("market", ""),
+                    "market": "Moneyline (П1/П2)",
                     "selection": selection,
                     "probability": p.get("modelProbabilityPct"),
                     "fair_odds": p.get("fairOdds"),
@@ -301,6 +308,7 @@ def get_all_betbetter_picks():
         except Exception as e:
             errors.append(f"{label}: {type(e).__name__}")
     return all_picks, ("Ошибки: " + "; ".join(errors)) if errors else None
+    
 def find_pinnwire_match(bb_home, bb_away, pinnwire_events):
     """Ищет матч PinnWire по именам игроков из Bet Better (по фамилии)."""
     def last_name(name):
