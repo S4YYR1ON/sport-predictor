@@ -205,11 +205,13 @@ if page == "Bet Better (ATP/WTA)":
 elif page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
+    region = st.selectbox("Регион", ["Все", "Европа"])
+    region_key = "europe" if region == "Европа" else "all"
     st.subheader(sport_label)
     
     if st.button("Загрузить доступные матчи", type="primary"):
         with st.spinner("Проверяю открытые источники…"):
-            events, warning = get_events(sport)
+            events, warning = get_events(sport, region=region_key)
         st.session_state["events"] = events
         st.session_state["events_sport"] = sport
         st.session_state["events_warning"] = warning
@@ -263,6 +265,26 @@ elif page == "Матчи и прогнозы":
                         st.write("**Надёжность данных:**", p["confidence"])
                         st.write("**Объяснение:**", p["explanation"])
                         st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
+                        prob = r["p"]["probability"]
+                        fair = r["p"]["fair_odds"]
+                        with st.expander("🔍 Проверить value с кэфом BetBoom", expanded=False):
+                            bookie_odd = st.number_input(
+                                "Введи кэф BetBoom на этот исход",
+                                min_value=1.01, max_value=100.0,
+                                value=float(round(fair, 2)), step=0.01,
+                                key=f"bookie_odd_{r['id']}"
+                            )
+                            if bookie_odd:
+                                val = prob * bookie_odd - 1
+                                col1, col2 = st.columns(2)
+                                col1.metric("Кэф BetBoom", f"{bookie_odd:.2f}")
+                                col2.metric("Value", f"{val:+.1%}")
+                                if val > 0.02:
+                                    st.success(f"✅ **VALUE есть!** {prob:.1%} × {bookie_odd:.2f} = {1+val:.3f}")
+                                elif val > -0.02:
+                                    st.warning(f"⚠️ **На грани:** {val:+.1%}. Лучше пропустить.")
+                                else:
+                                    st.error(f"❌ **Value нет:** {val:+.1%}. Нужен кэф минимум **{fair:.2f}**.")
                         if r.get("odds_error"):
                             st.warning(f"⚠️ Коэффициенты не получены: {r['odds_error']}")
     
