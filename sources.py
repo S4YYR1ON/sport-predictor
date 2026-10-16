@@ -549,7 +549,71 @@ def get_pinnapi_tennis_events():
         return events, f"Pinnapi: найдено матчей {len(events)}."
     except Exception as e:
         return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
+import pandas as pd
+
+@st.cache_data(ttl=86400)  # Кэш на 24 часа — Elo обновляется раз в неделю
+def get_elo_ratings(tour="atp"):
+    """Скачивает актуальные Elo-рейтинги с Tennis Abstract."""
+    if tour not in ("atp", "wta"):
+        return {}, "Тур должен быть 'atp' или 'wta'"
+    
+    url = f"http://tennisabstract.com/reports/{tour}_elo_ratings.html"
+    try:
+        tables = pd.read_html(url)
+        if not tables:
+            return {}, "Таблица Elo не найдена на странице."
         
+        df = tables[0]
+        # Приводим названия колонок к единому виду
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        # Ищем нужные колонки (могут называться по-разному)
+        player_col = None
+        elo_col = None
+        for col in df.columns:
+            col_lower = str(col).lower()
+            if "player" in col_lower:
+                player_col = col
+            if col_lower == "elo":
+                elo_col = col
+        
+        if not player_col or not elo_col:
+            return {}, f"Не найдены колонки Player/Elo. Доступные: {list(df.columns)}"
+        
+        df[elo_col] = pd.to_numeric(df[elo_col], errors="coerce")
+        df[player_col] = df[player_col].astype(str).str.strip()
+        
+        # Убираем строки с пустым Elo или именем
+        df = df.dropna(subset=[elo_col, player_col])
+        
+        elo_dict = dict(zip(df[player_col], df[elo_col]))
+        return elo_dict, None
+    except Exception as e:
+        return {}, f"Ошибка загрузки Elo: {type(e).__name__} - {e}"
+
+def find_elo_player(elo_dict, player_name):
+    """Ищет игрока в словаре Elo по фамилии (Tennis Abstract использует полные имена)."""
+    if not player_name or not elo_dict:
+        return None
+    
+    # 1. Точное совпадение
+    if player_name in elo_dict:
+        return elo_dict[player_name]
+    
+    # 2. Поиск по фамилии (последнее слово в имени)
+    parts = player_name.strip().split()
+    if not parts:
+        return None
+    last_name = parts[-1].lower()
+    
+    # 3. Ищем, чтобы фамилия содержалась в имени игрока из базы
+    for key, val in elo_dict.items():
+        key_lower = key.lower()
+        if last_name in key_lower:
+            return val
+    
+    return None
+    
 def source_status():
     out = {}
     try:
