@@ -461,6 +461,10 @@ def get_pinnapi_tennis_events():
             if not home or not away:
                 continue
 
+            # Пропускаем дубликаты с суффиксом "(Games)" — это отдельный рынок гандикапов
+            if "(Games)" in home or "(Games)" in away or "(games)" in home or "(games)" in away:
+                continue
+
             # Ищем Moneyline в periods.num_0
             odds_home = None
             odds_away = None
