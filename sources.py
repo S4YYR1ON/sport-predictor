@@ -29,26 +29,31 @@ API_SPORTS_ENDPOINTS = {
 LIVETENNIS_BASE = "https://api.livetennisapi.com/v1"
 
 @st.cache_data(ttl=600)
-def get_tennis_events(date_str=None):
-    """Получает теннисные матчи из Live Tennis API."""
+def get_tennis_events():
+    """Получает предстоящие теннисные матчи из Live Tennis API."""
     try:
         api_key = st.secrets["LIVETENNIS_API_KEY"]
     except (KeyError, FileNotFoundError):
         return None, "Ключ Live Tennis API не настроен."
 
-    if not date_str:
-        date_str = datetime.now().strftime("%Y-%m-%d")
-
-    url = f"{LIVETENNIS_BASE}/matches"
+    # ✅ Правильный URL из документации
+    url = "https://api.livetennisapi.com/api/public/v1/matches"
+    # ✅ Ключ можно передать и в заголовке, и в параметре. Заголовок надёжнее.
     headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"date": date_str}
+    # ✅ Используем параметр status=upcoming, чтобы получить будущие матчи
+    params = {"status": "upcoming"}
 
     try:
         response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
+        
+        # ✅ Структура ответа может быть вложенной. Ищем список матчей.
+        matches_list = data.get("matches", []) or data.get("data", [])
+        
         events = []
-        for match in data.get("matches", []):
+        for match in matches_list:
+            # ✅ Исправляем названия полей в соответствии с документацией
             events.append({
                 "home": match.get("player1", {}).get("name", "Unknown"),
                 "away": match.get("player2", {}).get("name", "Unknown"),
@@ -59,7 +64,7 @@ def get_tennis_events(date_str=None):
             })
         return events, None
     except Exception as e:
-        return None, f"Ошибка Live Tennis API: {type(e).__name__}"
+        return None, f"Ошибка Live Tennis API: {type(e).__name__} - {e}"
 
 @st.cache_data(ttl=600)
 def get_api_sports_events(sport, date_str=None):
