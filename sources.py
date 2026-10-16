@@ -30,22 +30,20 @@ LIVETENNIS_BASE = "https://api.livetennisapi.com/v1"
 
 @st.cache_data(ttl=600)
 def get_tennis_events():
-    """Получает предстоящие теннисные матчи из Live Tennis API."""
+    """Получает предстоящие теннисные матчи из Live Tennis API (v2)."""
     try:
         api_key = st.secrets["LIVETENNIS_API_KEY"]
     except (KeyError, FileNotFoundError):
         return None, "Ключ Live Tennis API не настроен."
 
-    url = "https://api.livetennisapi.com/api/public/v1/matches"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"status": "upcoming"}
+    # Новый правильный URL с ключом в параметрах
+    url = f"https://live-tennis-api.com/api/v2/matches?api_key={api_key}"
 
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        response = requests.get(url, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
 
-        # API возвращает список матчей
         if isinstance(data, list):
             matches_list = data
         elif isinstance(data, dict):
@@ -71,18 +69,15 @@ def get_tennis_events():
             if not home or not away:
                 continue
 
-            # Формируем дополнительную информацию
-            draw = match.get("draw", "")  # singles / doubles
+            draw = match.get("draw", "")
             status = match.get("event_status") or "scheduled"
             has_market = match.get("has_market", False)
+            match_id = match.get("id")  # 👈 Сохраняем ID матча!
 
-            # Пропускаем уже завершённые матчи
             if status == "Finished":
                 continue
 
             start = match.get("created_at") or ""
-
-            # Формируем понятное название
             draw_label = "Одиночный" if draw == "singles" else "Парный"
             market_label = "коэф. есть" if has_market else "коэф. нет"
 
@@ -92,7 +87,9 @@ def get_tennis_events():
                 "start": start,
                 "source": f"Live Tennis API · {draw_label} · {market_label}",
                 "odds_home": None,
-                "odds_away": None
+                "odds_away": None,
+                "match_id": match_id,        # 👈 Добавляем в словарь
+                "has_market": has_market     # 👈 Полезный флаг
             })
 
         if not events:
@@ -101,6 +98,48 @@ def get_tennis_events():
         return events, f"Источник: Live Tennis API. Найдено матчей: {len(events)}."
     except Exception as e:
         return None, f"Ошибка Live Tennis API: {type(e).__name__} - {e}"
+
+@st.cache_data(ttl=600)
+def get_match_odds(match_id):
+    """Получает коэффициенты для конкретного матча по его ID."""
+    try:
+        api_key = st.secrets["LIVETENNIS_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        return None
+
+    url = f"https://live-tennis-api.com/api/v2/match/details?api_key={api_key}&match_id={match_id}"
+
+    try:
+        response = requests.get(url, timeout=TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Ищем коэффициенты в ответе. Структура может отличаться, 
+        # поэтому проверяем несколько вероятных мест.
+        odds = data.get("odds") or data.get("markets") or {}
+        
+        # Если коэффициенты в формате {"home": 1.5, "away": 2.5}
+        if isinstance(odds, dict):
+            return {
+                "home": odds.get("home") or odds.get("p1") or odds.get("1"),
+                "away": odds.get("away") or odds.get("p2") or odds.get("2")
+            }
+        
+        # Если это список рынков
+        if isinstance(odds, list):
+            for market in odds:
+                if market.get("name") in ["ML", "Moneyline", "Winner"]:
+                    outcomes = market.get("odds", [])
+                    for o in outcomes:
+                        if o.get("name") == "Home" or o.get("id") == 1:
+                            home_odd = o.get("price")
+                        if o.get("name") == "Away" or o.get("id") == 2:
+                            away_odd = o.get("price")
+                    return {"home": home_odd, "away": away_odd}
+                    
+        return None
+    except Exception as e:
+        return None
 
 @st.cache_data(ttl=600)
 def get_api_sports_events(sport, date_str=None):
