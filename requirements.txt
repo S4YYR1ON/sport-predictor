@@ -5,3 +5,4 @@ psycopg2-binary>=2.9.6
 st-supabase-connection>=1.0.0
 pinnwire
 betbetter
+pinnapi
