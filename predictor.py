@@ -1,5 +1,26 @@
-from sources import find_elo_player
-
+def find_elo_player(elo_dict, player_name):
+    """Ищет игрока в словаре Elo по фамилии (Tennis Abstract использует полные имена)."""
+    if not player_name or not elo_dict:
+        return None
+    
+    # 1. Точное совпадение
+    if player_name in elo_dict:
+        return elo_dict[player_name]
+    
+    # 2. Поиск по фамилии (последнее слово)
+    parts = player_name.strip().split()
+    if not parts:
+        return None
+    last_name = parts[-1].lower()
+    
+    # 3. Ищем, чтобы фамилия содержалась в имени игрока из базы
+    for key, val in elo_dict.items():
+        key_lower = key.lower()
+        if last_name in key_lower:
+            return val
+    
+    return None
+    
 def predict(sport, event, elo_dict=None):
     a = event.get("home", "Участник A")
     b = event.get("away", "Участник B")
