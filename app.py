@@ -3,7 +3,20 @@ import pandas as pd
 from db import init_db, save_prediction, list_predictions, settle_prediction, summary
 from predictor import predict
 from sources import get_events, source_status
+from datetime import datetime
 
+def format_time(raw):
+    """Превращает '2026-10-17T08:30:00.0000000Z' в '17.10.2026 08:30'."""
+    if not raw:
+        return "неизвестно"
+    try:
+        # Отрезаем лишние нули после секунд
+        clean = raw.split(".")[0].replace("Z", "")
+        dt = datetime.fromisoformat(clean)
+        return dt.strftime("%d.%m.%Y %H:%M")
+    except Exception:
+        return str(raw)
+        
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
 init_db()
 SPORTS = {
@@ -23,38 +36,87 @@ with st.sidebar:
     st.caption("MVP: прогнозы экспериментальные. Никаких гарантий выигрыша.")
 if page == "Bet Better (ATP/WTA)":
     st.subheader("📊 Прогнозы модели Bet Better")
-    st.caption("Независимая статистическая модель для тенниса ATP и WTA. Вероятности и fair odds — не коэффициенты букмекеров.")
-    
+    st.caption("Независимая статистическая модель для тенниса ATP и WTA. "
+               "Вероятности и справедливые кэфы — это оценка модели, а не коэффициенты букмекеров.")
+
     if st.button("Загрузить прогнозы", type="primary"):
-        with st.spinner("Загружаю прогнозы модели…"):
-            from sources import get_all_betbetter_picks
-            picks, error = get_all_betbetter_picks()
+        with st.spinner("Загружаю прогнозы и сопоставляю с Pinnacle…"):
+            from sources import get_betbetter_with_value
+            picks, error = get_betbetter_with_value()
             st.session_state["bb_picks"] = picks
             st.session_state["bb_error"] = error
-    
+
     if st.session_state.get("bb_error"):
         st.warning(st.session_state["bb_error"])
-    
+
     picks = st.session_state.get("bb_picks", [])
+
     if not picks:
         st.info("Нажми «Загрузить прогнозы», чтобы получить список матчей.")
     else:
-        st.success(f"Найдено прогнозов: {len(picks)}")
-        for i, p in enumerate(picks):
+        # Фильтр по уверенности
+        show_only_strong = st.checkbox(
+            "Показывать только УМЕРЕННЫЕ и ВЫСОКИЕ (LEAN / HIGH)",
+            value=False
+        )
+        show_only_value = st.checkbox(
+            "Показывать только матчи с потенциальным VALUE",
+            value=False
+        )
+
+        # Перевод уверенности на русский
+        CONF_RU = {
+            "HIGH": "🟢 ВЫСОКАЯ",
+            "LEAN": "🟡 УМЕРЕННАЯ",
+            "LONG-SHOT": "🔴 РИСКОВАННАЯ",
+        }
+
+        # Фильтрация
+        filtered = picks
+        if show_only_strong:
+            filtered = [p for p in filtered if p.get("confidence") in ("HIGH", "LEAN")]
+        if show_only_value:
+            filtered = [p for p in filtered if (p.get("value") or 0) > 0]
+
+        st.success(f"Найдено прогнозов: {len(filtered)} (из {len(picks)})")
+
+        for i, p in enumerate(filtered):
             with st.container(border=True):
                 st.markdown(f"**{p['home']} — {p['away']}**")
-                st.caption(f"🏆 {p['tour']} · Начало: {p.get('game_time', 'неизвестно')}")
+                st.caption(f"🏆 {p['tour']} · Начало: {format_time(p.get('game_time', ''))}")
                 st.caption(f"Рынок: {p.get('market', '')}")
-                
+
                 a, b, c = st.columns(3)
                 a.metric("Прогноз модели", p.get("selection", ""))
                 b.metric("Вероятность", f"{p['probability']}%" if p.get("probability") is not None else "—")
-                c.metric("Fair odds", f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—")
-                
-                if p.get("confidence"):
-                    st.caption(f"Уверенность модели: **{p['confidence']}**")
+                c.metric("Справедливый кэф", f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—")
+
+                conf_ru = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
+                st.caption(f"Уверенность модели: **{conf_ru}**")
+
+                # Коэффициент Pinnacle и value
+                if p.get("match_found"):
+                    if p.get("market_odd"):
+                        odd = p["market_odd"]
+                        val = p.get("value")
+                        col1, col2 = st.columns(2)
+                        col1.metric("Кэф Pinnacle", f"{odd:.2f}")
+                        if val is not None:
+                            if val > 0:
+                                col2.metric("VALUE", f"{val:+.1%}", delta_color="normal")
+                                st.success(f"✅ Потенциальный VALUE: вероятность модели {p['probability']}% × кэф {odd:.2f} = {1+val:.3f}")
+                            else:
+                                col2.metric("VALUE", f"{val:+.1%}", delta_color="inverse")
+                                st.info(f"❌ Value нет: вероятность модели {p['probability']}% × кэф {odd:.2f} = {1+val:.3f}")
+                    else:
+                        st.caption("⚠️ Матч найден в Pinnacle, но подходящий спред или moneyline отсутствует.")
+                else:
+                    st.caption("⚠️ Матч не найден в Pinnacle — сравнить кэфы не удалось.")
+
                 if p.get("verdict"):
-                    st.write(p["verdict"])
+                    with st.expander("Объяснение модели"):
+                        st.write(p["verdict"])
+
 elif page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
