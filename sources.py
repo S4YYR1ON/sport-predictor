@@ -240,35 +240,30 @@ def get_espn_events(sport):
 # ========== Главная функция ==========
 def get_events(sport):
     if sport == "tennis":
-        # 1. PinnWire (с коэффициентами)
-        events, error = get_pinnwire_tennis_odds()
+        # Pinnapi — реальные коэффициенты Moneyline от Pinnacle
+        events, error = get_pinnapi_tennis_events()
         if events:
-            return events, f"Источник: PinnWire (Pinnacle). Найдено матчей: {len(events)}."
-        st.warning(f"PinnWire недоступен: {error}. Пробую Live Tennis API.")
+            return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
+        st.warning(f"Pinnapi недоступен: {error}. Пробую Bet Better.")
 
-        # 2. Live Tennis API (без коэффициентов)
-        events, error2 = get_tennis_events_legacy()
-        if events:
-            return events, f"Источник: Live Tennis API (без коэф.). Найдено: {len(events)}."
+        # Резерв: Bet Better (только гандикапы)
+        all_picks, bb_error = get_all_betbetter_picks()
+        if all_picks:
+            events = []
+            for p in all_picks:
+                events.append({
+                    "home": p["home"],
+                    "away": p["away"],
+                    "start": p.get("game_time", ""),
+                    "source": f"Bet Better · {p.get('market', '')}",
+                    "odds_home": None,
+                    "odds_away": None,
+                })
+            return events, f"Источник: Bet Better. Найдено: {len(events)}."
+        
+        return [], f"Все источники недоступны: {error}; {bb_error}"
 
-        # 3. ESPN (совсем резерв)
-        st.warning(f"Live Tennis API недоступен: {error2}. Пробую ESPN.")
-        return get_espn_events("tennis")
-
-    if sport == "football":
-        return get_espn_events("football")
-
-    if sport == "dota2":
-        try:
-            r = requests.get("https://api.opendota.com/api/status", timeout=TIMEOUT)
-            r.raise_for_status()
-            return [], "OpenDota доступен, но не даёт расписания."
-        except Exception as e:
-            return [], f"OpenDota недоступен: {type(e).__name__}"
-    if sport == "cs2":
-        return [], "Источник CS2 не подключён."
-
-    return [], "Нет доступных матчей."
+    # ... остальной код для других видов спорта ...
     
 def get_all_betbetter_picks():
     """Получает прогнозы Bet Better для тенниса (ATP + WTA)."""
