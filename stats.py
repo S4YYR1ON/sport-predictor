@@ -7,7 +7,7 @@ SACKMANN_BASE = "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-arc
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def load_matches(tour="atp", years=(2023, 2024, 2025, 2026)):
+def load_matches(tour="atp", years=(2021, 2022, 2023, 2024, 2025, 2026)):
     """Загружает матчи ATP/WTA из архива Sackmann."""
     all_matches = []
     base = f"{SACKMANN_BASE}/{tour}"
