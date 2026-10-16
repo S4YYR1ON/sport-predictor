@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from db import init_db, save_prediction, list_predictions, settle_prediction, summary
 from predictor import predict
-from sources import get_events, source_status
+from sources import get_events, source_status, get_match_odds
 
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
 init_db()
