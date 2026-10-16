@@ -1,24 +1,16 @@
 def find_elo_player(elo_dict, player_name):
-    """Ищет игрока в словаре Elo по фамилии (Tennis Abstract использует полные имена)."""
+    """Ищет игрока в словаре Elo по фамилии."""
     if not player_name or not elo_dict:
         return None
-    
-    # 1. Точное совпадение
     if player_name in elo_dict:
         return elo_dict[player_name]
-    
-    # 2. Поиск по фамилии (последнее слово)
     parts = player_name.strip().split()
     if not parts:
         return None
     last_name = parts[-1].lower()
-    
-    # 3. Ищем, чтобы фамилия содержалась в имени игрока из базы
     for key, val in elo_dict.items():
-        key_lower = key.lower()
-        if last_name in key_lower:
+        if last_name in key.lower():
             return val
-    
     return None
     
 def predict(sport, event, elo_dict=None):
@@ -30,7 +22,9 @@ def predict(sport, event, elo_dict=None):
         elo_a = find_elo_player(elo_dict, a)
         elo_b = find_elo_player(elo_dict, b)
         if elo_a and elo_b:
-            prob_a = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+            elo_a_val = elo_a.get("elo")
+            elo_b_val = elo_b.get("elo")
+            prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
             prob_b = 1 - prob_a
             
             if prob_a >= prob_b:
