@@ -29,7 +29,7 @@ API_SPORTS_ENDPOINTS = {
 LIVETENNIS_BASE = "https://api.livetennisapi.com/v1"
 
 @st.cache_data(ttl=600)
-def get_tennis_events():
+def get_tennis_events_legacy():
     """Получает предстоящие теннисные матчи из Live Tennis API."""
     try:
         api_key = st.secrets["LIVETENNIS_API_KEY"]
