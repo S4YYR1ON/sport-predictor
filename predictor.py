@@ -40,9 +40,28 @@ def predict(sport, event, elo_dict=None, surface="hard"):
                 elo_b_val = elo_b.get("elo") if isinstance(elo_b, dict) else elo_b
                 surface_key = "elo"
             
-            if elo_a_val and elo_b_val:
+                        if elo_a_val and elo_b_val:
                 prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
                 prob_b = 1 - prob_a
+                
+                # === КАЛИБРОВОЧНАЯ ПОПРАВКА ===
+                # Elo слегка переоценивает фаворитов и недооценивает андердогов.
+                # Сдвигаем вероятность на 5% в сторону 50%.
+                def calibrate(p):
+                    if p > 0.5:
+                        return p - 0.05 * (p - 0.5)
+                    else:
+                        return p + 0.05 * (0.5 - p)
+                
+                prob_a_cal = calibrate(prob_a)
+                prob_b_cal = calibrate(prob_b)
+                # Нормализуем, чтобы сумма была ровно 1
+                total = prob_a_cal + prob_b_cal
+                prob_a_cal /= total
+                prob_b_cal /= total
+                
+                prob_a = prob_a_cal
+                prob_b = prob_b_cal
                 
                 if prob_a >= prob_b:
                     selection = f"Победа {a}"
@@ -59,12 +78,13 @@ def predict(sport, event, elo_dict=None, surface="hard"):
                 surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(surface, "хард")
                 
                 explanation = (
-                    f"Прогноз на основе Elo-рейтингов Tennis Abstract ({surface_ru}). "
+                    f"Прогноз на основе Elo-рейтингов Tennis Abstract ({surface_ru}), "
+                    f"с калибровочной поправкой. "
                     f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
                     f"Вероятность победы {fav} — {probability:.1%}, "
                     f"{dog} — {1-probability:.1%}."
                 )
-                confidence = f"средняя — Elo-модель ({surface_ru})"
+                confidence = f"средняя — Elo-модель + калибровка ({surface_ru})"
                 
                 return {
                     "selection": selection,
@@ -75,5 +95,3 @@ def predict(sport, event, elo_dict=None, surface="hard"):
                     "explanation": explanation,
                     "confidence": confidence,
                 }
-    
-    # ... остальной код fallback без изменений ...
