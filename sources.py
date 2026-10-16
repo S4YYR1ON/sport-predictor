@@ -101,47 +101,65 @@ def get_tennis_events():
     except Exception as e:
         return None, f"Ошибка Live Tennis API: {type(e).__name__} - {e}"
 
+import requests
+import streamlit as st
+from datetime import datetime
+
+TIMEOUT = 10
+
+# ========== PinnWire ==========
+PINNWIRE_BASE = "https://api.pinnwire.com/kit/v1"
+
 @st.cache_data(ttl=600)
-def get_match_odds(match_id):
-    """Получает коэффициенты для конкретного матча по его ID."""
+def get_pinnwire_tennis_odds():
+    """Получает теннисные матчи и коэффициенты из PinnWire."""
     try:
-        api_key = st.secrets["LIVETENNIS_API_KEY"]
+        api_key = st.secrets["PINNWIRE_API_KEY"]
     except (KeyError, FileNotFoundError):
-        return None, "Ключ не настроен."
+        return None, "Ключ PinnWire не настроен."
 
-    # Новый эндпоинт из документации
-    url = "https://api.livetennisapi.com/api/public/v1/markets"
-    headers = {"X-API-Key": api_key}
-    params = {"match_id": match_id}
+    # sport_id=2 — это теннис
+    url = f"{PINNWIRE_BASE}/markets"
+    params = {"sport_id": 2, "key": api_key}
 
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
-        
-        # Если PRO-тариф требуется, вернём понятную ошибку
-        if response.status_code in [401, 403]:
-            return None, "Для получения коэффициентов нужен тариф PRO."
-            
+        response = requests.get(url, params=params, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
 
-        # Согласно документации, data содержит максимум один объект
-        markets = data.get("data", [])
-        if not markets:
-            return None, "Коэффициенты для этого матча не найдены."
+        events = []
+        for match in data.get("events", data.get("data", [])):
+            home = match.get("home") or match.get("home_team")
+            away = match.get("away") or match.get("away_team")
+            odds_home = match.get("odds", {}).get("home") or match.get("price_home")
+            odds_away = match.get("odds", {}).get("away") or match.get("price_away")
 
-        market = markets[0]
-        
-        # Пытаемся извлечь коэффициенты (структура может отличаться)
-        # Обычно это home_odds / away_odds или p1_odds / p2_odds
-        home_odd = market.get("home_odds") or market.get("p1_odds") or market.get("home")
-        away_odd = market.get("away_odds") or market.get("p2_odds") or market.get("away")
-
-        if not home_odd or not away_odd:
-            return None, "Не удалось распознать структуру коэффициентов."
-
-        return {"home": home_odd, "away": away_odd}, None
+            if home and away:
+                events.append({
+                    "home": home,
+                    "away": away,
+                    "start": match.get("start_time", ""),
+                    "source": "PinnWire · Pinnacle",
+                    "odds_home": odds_home,
+                    "odds_away": odds_away,
+                    "match_id": match.get("id"),
+                })
+        return events, None
     except Exception as e:
-        return None, f"Ошибка: {type(e).__name__} - {e}"
+        return None, f"Ошибка PinnWire: {type(e).__name__} - {e}"
+
+def get_events(sport):
+    if sport == "tennis":
+        # Сначала пробуем PinnWire (там есть коэффициенты)
+        events, error = get_pinnwire_tennis_odds()
+        if events:
+            return events, "Источник: PinnWire (Pinnacle). Коэффициенты доступны."
+        else:
+            st.warning(f"PinnWire недоступен: {error}. Пробую Live Tennis API (без коэффициентов).")
+            # Если PinnWire не сработал, пробуем Live Tennis API как раньше
+            return get_tennis_events_legacy()
+
+    # ... остальной код для других видов спорта ...
 
 @st.cache_data(ttl=600)
 def get_api_sports_events(sport, date_str=None):
