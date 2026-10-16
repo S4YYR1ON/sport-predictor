@@ -296,14 +296,11 @@ def get_events(sport, region="all", tour_filter="all"):
     if sport == "tennis":
         events, error = get_pinnapi_tennis_events()
         if events:
-            # Фильтр по регионам
             if region == "europe":
                 events = [e for e in events if is_european_league(e.get("league_name", ""))]
-            # Фильтр по категории турнира
             if tour_filter == "top":
                 events = [e for e in events if is_top_tournament(e.get("league_name", ""))]
             return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
-        st.warning(f"Pinnapi недоступен: {error}. Пробую Bet Better.")
         # ... остальной резервный код без изменений ...
 
         # Резерв: Bet Better (только гандикапы)
