@@ -553,7 +553,7 @@ import pandas as pd
 
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
-    """Скачивает Elo-рейтинги с Tennis Abstract, притворяясь браузером."""
+    """Скачивает Elo-рейтинги с Tennis Abstract."""
     if tour not in ("atp", "wta"):
         return {}, "Тур должен быть 'atp' или 'wta'"
 
@@ -566,27 +566,41 @@ def get_elo_ratings(tour="atp"):
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        
+
         from io import StringIO
         tables = pd.read_html(StringIO(response.text))
-        
-        if not tables:
-            st.error("🔍 Elo: таблицы не найдены")
-            return {}, "Таблица Elo не найдена."
 
-        st.write(f"🔍 Elo: всего таблиц — {len(tables)}")
-        
-        # Показываем структуру каждой таблицы
-        for i, tbl in enumerate(tables):
-            st.write(f"--- Таблица {i} ---")
-            st.write(f"Размер: {tbl.shape}")
-            st.write(f"Колонки: {list(tbl.columns)}")
-            st.dataframe(tbl.head(3))
-        
-        return {}, "Отладка: смотри вывод выше."
-        
+        # Настоящие рейтинги — во второй таблице (индекс 1)
+        if len(tables) < 2:
+            return {}, "Не найдена таблица с рейтингами."
+
+        df = tables[1].copy()
+
+        # Нормализуем имена колонок (убираем \xa0 — неразрывные пробелы)
+        df.columns = [str(c).replace("\xa0", " ").strip() for c in df.columns]
+
+        # Проверяем наличие нужных колонок
+        if "Player" not in df.columns or "Elo" not in df.columns:
+            return {}, f"Не найдены колонки Player/Elo. Есть: {list(df.columns)}"
+
+        # Преобразуем Elo в числа
+        df["Elo"] = pd.to_numeric(df["Elo"], errors="coerce")
+        df["Player"] = df["Player"].astype(str).str.strip()
+        df = df.dropna(subset=["Elo", "Player"])
+
+        # Создаём словарь: {имя: {"elo": ..., "hElo": ..., "cElo": ..., "gElo": ...}}
+        elo_dict = {}
+        for _, row in df.iterrows():
+            elo_dict[row["Player"]] = {
+                "elo": row["Elo"],
+                "hElo": pd.to_numeric(row.get("hElo"), errors="coerce"),
+                "cElo": pd.to_numeric(row.get("cElo"), errors="coerce"),
+                "gElo": pd.to_numeric(row.get("gElo"), errors="coerce"),
+            }
+
+        return elo_dict, None
+
     except Exception as e:
-        st.error(f"🔍 Elo: исключение — {type(e).__name__} - {e}")
         return {}, f"Ошибка Elo: {type(e).__name__} - {e}"
     
 def source_status():
