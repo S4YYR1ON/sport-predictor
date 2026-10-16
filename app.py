@@ -85,23 +85,32 @@ if page == "Bet Better (ATP/WTA)":
             with st.container(border=True):
                 st.markdown(f"**{p['home']} — {p['away']}**")
                 st.caption(f"🏆 {p['tour']} · Начало: {format_time(p.get('game_time', ''))}")
-                
-                # Понятное объяснение прогноза
+
+                # === МЕТРИКИ: прогноз, вероятность, fair odds ===
                 sel = p.get("selection", "")
+                a, b, c = st.columns(3)
+                a.metric("Прогноз модели", sel)
+                b.metric("Вероятность", f"{p['probability']}%" if p.get("probability") is not None else "—")
+                c.metric("Справедливый кэф", f"{p['fair_odds']:.2f}" if p.get("fair_odds") else "—")
+
+                # === Пояснение гандикапа простыми словами ===
                 if "handicap" in sel.lower():
-                    # Извлекаем имя игрока и число
                     import re
                     m = re.search(r"([-+]?\d+\.?\d*)\s*games", sel)
                     line = m.group(1) if m else "?"
-                    player = sel.split("-")[0].strip() if "-" in sel else sel.split()[0]
+                    # Берём имя игрока до пробела с числом
+                    player = re.split(r"\s[-+]?\d", sel)[0].strip() if re.search(r"\s[-+]?\d", sel) else sel.split()[0]
                     st.info(f"📌 **Что значит прогноз:** {player} должен выиграть матч "
                             f"с разницей в геймах больше {line}. То есть, например, 6:2, 6:3 "
                             f"(разница +7) — зайдёт. А 6:4, 7:6 (разница +3) — не зайдёт.")
-                    st.caption(f"Рынок: {p.get('market', '')} · Полная формулировка: {sel}")
-                else:
-                    st.caption(f"Рынок: {p.get('market', '')} · Прогноз: {sel}")
 
-                # Коэффициент Pinnacle и value
+                st.caption(f"Рынок: {p.get('market', '')} · Полная формулировка: {sel}")
+
+                # === Уверенность модели ===
+                conf_ru = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
+                st.caption(f"Уверенность модели: **{conf_ru}**")
+
+                # === Сопоставление с Pinnacle и расчёт VALUE ===
                 if p.get("match_found"):
                     if p.get("market_odd"):
                         odd = p["market_odd"]
@@ -110,30 +119,24 @@ if page == "Bet Better (ATP/WTA)":
                         col1.metric("Кэф Pinnacle", f"{odd:.2f}")
                         if val is not None:
                             if val > 0:
-                                col2.metric("VALUE", f"{val:+.1%}", delta_color="normal")
-                                st.success(f"✅ Потенциальный VALUE: вероятность модели {p['probability']}% × кэф {odd:.2f} = {1+val:.3f}")
+                                col2.metric("VALUE", f"{val:+.1%}")
+                                st.success(f"✅ Потенциальный VALUE: {p['probability']}% × {odd:.2f} = {1+val:.3f}")
                             else:
-                                col2.metric("VALUE", f"{val:+.1%}", delta_color="inverse")
-                                st.info(f"❌ Value нет: вероятность модели {p['probability']}% × кэф {odd:.2f} = {1+val:.3f}")
+                                col2.metric("VALUE", f"{val:+.1%}")
+                                st.info(f"❌ Value нет: {p['probability']}% × {odd:.2f} = {1+val:.3f}")
                     else:
-                        st.caption("⚠️ Матч найден в Pinnacle, но подходящий спред или moneyline отсутствует.")
+                        st.caption("⚠️ Матч найден в Pinnacle, но подходящий спред отсутствует.")
                 else:
                     st.caption("⚠️ Матч не найден в Pinnacle — сравнить кэфы не удалось.")
 
-                # Русское объяснение на основе данных модели
-                conf_text = CONF_RU.get(p.get("confidence", ""), p.get("confidence", ""))
-                prob = p.get("probability")
-                fair = p.get("fair_odds")
-                sel = p.get("selection", "")
+                # === Русское объяснение модели ===
                 game_date = format_time(p.get("game_time", ""))
-
                 explanation = (
                     f"По оценке модели Bet Better на {game_date} исход "
-                    f"«{sel}» имеет вероятность {prob}%, что соответствует "
-                    f"справедливому коэффициенту {fair:.2f}. "
-                    f"Уверенность модели: {conf_text}."
+                    f"«{sel}» имеет вероятность {p['probability']}%, что соответствует "
+                    f"справедливому коэффициенту {p['fair_odds']:.2f}. "
+                    f"Уверенность модели: {conf_ru}."
                 )
-
                 with st.expander("Объяснение модели (на русском)"):
                     st.write(explanation)
                     if p.get("verdict"):
