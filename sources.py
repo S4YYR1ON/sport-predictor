@@ -36,9 +36,9 @@ def get_tennis_events():
     except (KeyError, FileNotFoundError):
         return None, "Ключ Live Tennis API не настроен."
 
-    # Возвращаемся к рабочему URL
     url = "https://api.livetennisapi.com/api/public/v1/matches"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    # Используем заголовок X-API-Key, как указано в документации
+    headers = {"X-API-Key": api_key}
     params = {"status": "upcoming"}
 
     try:
@@ -107,41 +107,41 @@ def get_match_odds(match_id):
     try:
         api_key = st.secrets["LIVETENNIS_API_KEY"]
     except (KeyError, FileNotFoundError):
-        return None
+        return None, "Ключ не настроен."
 
-    url = f"https://live-tennis-api.com/api/v2/match/details?api_key={api_key}&match_id={match_id}"
+    # Новый эндпоинт из документации
+    url = "https://api.livetennisapi.com/api/public/v1/markets"
+    headers = {"X-API-Key": api_key}
+    params = {"match_id": match_id}
 
     try:
-        response = requests.get(url, timeout=TIMEOUT)
+        response = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        
+        # Если PRO-тариф требуется, вернём понятную ошибку
+        if response.status_code in [401, 403]:
+            return None, "Для получения коэффициентов нужен тариф PRO."
+            
         response.raise_for_status()
         data = response.json()
+
+        # Согласно документации, data содержит максимум один объект
+        markets = data.get("data", [])
+        if not markets:
+            return None, "Коэффициенты для этого матча не найдены."
+
+        market = markets[0]
         
-        # Ищем коэффициенты в ответе. Структура может отличаться, 
-        # поэтому проверяем несколько вероятных мест.
-        odds = data.get("odds") or data.get("markets") or {}
-        
-        # Если коэффициенты в формате {"home": 1.5, "away": 2.5}
-        if isinstance(odds, dict):
-            return {
-                "home": odds.get("home") or odds.get("p1") or odds.get("1"),
-                "away": odds.get("away") or odds.get("p2") or odds.get("2")
-            }
-        
-        # Если это список рынков
-        if isinstance(odds, list):
-            for market in odds:
-                if market.get("name") in ["ML", "Moneyline", "Winner"]:
-                    outcomes = market.get("odds", [])
-                    for o in outcomes:
-                        if o.get("name") == "Home" or o.get("id") == 1:
-                            home_odd = o.get("price")
-                        if o.get("name") == "Away" or o.get("id") == 2:
-                            away_odd = o.get("price")
-                    return {"home": home_odd, "away": away_odd}
-                    
-        return None
+        # Пытаемся извлечь коэффициенты (структура может отличаться)
+        # Обычно это home_odds / away_odds или p1_odds / p2_odds
+        home_odd = market.get("home_odds") or market.get("p1_odds") or market.get("home")
+        away_odd = market.get("away_odds") or market.get("p2_odds") or market.get("away")
+
+        if not home_odd or not away_odd:
+            return None, "Не удалось распознать структуру коэффициентов."
+
+        return {"home": home_odd, "away": away_odd}, None
     except Exception as e:
-        return None
+        return None, f"Ошибка: {type(e).__name__} - {e}"
 
 @st.cache_data(ttl=600)
 def get_api_sports_events(sport, date_str=None):
