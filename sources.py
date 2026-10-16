@@ -301,6 +301,105 @@ def get_all_betbetter_picks():
         except Exception as e:
             errors.append(f"{label}: {type(e).__name__}")
     return all_picks, ("Ошибки: " + "; ".join(errors)) if errors else None
+def find_pinnwire_match(bb_home, bb_away, pinnwire_events):
+    """Ищет матч PinnWire по именам игроков из Bet Better (по фамилии)."""
+    def last_name(name):
+        clean = str(name).replace("(Games)", "").replace("(games)", "").strip().lower()
+        parts = clean.split()
+        return parts[-1] if parts else ""
+
+    bb_h = last_name(bb_home)
+    bb_a = last_name(bb_away)
+    if not bb_h or not bb_a:
+        return None
+
+    for ev in pinnwire_events:
+        pw_h = last_name(ev.get("home", ""))
+        pw_a = last_name(ev.get("away", ""))
+        if (bb_h == pw_h and bb_a == pw_a) or (bb_h == pw_a and bb_a == pw_h):
+            return ev
+    return None
+
+
+@st.cache_data(ttl=600)
+def get_betbetter_with_value():
+    """Возвращает прогнозы Bet Better, обогащённые коэффициентами PinnWire и value-расчётом."""
+    # Загружаем Bet Better
+    all_picks, error = get_all_betbetter_picks()
+    if error:
+        return [], error
+
+    # Загружаем PinnWire для сопоставления
+    pinnwire_events = []
+    try:
+        api_key = st.secrets["PINNWIRE_API_KEY"]
+        url = f"{PINNWIRE_BASE}/markets"
+        params = {"sport_id": 2, "key": api_key}
+        resp = requests.get(url, params=params, timeout=TIMEOUT)
+        if resp.ok:
+            data = resp.json()
+            pinnwire_events = data.get("events") or data.get("data") or data.get("markets") or []
+    except Exception:
+        pass  # PinnWire может быть недоступен — работаем без него
+
+    # Обогащаем каждую ставку
+    for pick in all_picks:
+        market_odd = None
+        value = None
+        match_found = None
+
+        # Ищем матч в PinnWire
+        match = find_pinnwire_match(pick["home"], pick["away"], pinnwire_events)
+
+        if match:
+            match_found = match
+            periods = match.get("periods") or {}
+            main = periods.get("num_0") or {}
+
+            # Определяем, на какую сторону ставим: сравниваем фамилию из selection с home/away
+            sel_lower = pick["selection"].lower()
+            home_last = str(pick["home"]).split()[-1].lower()
+            away_last = str(pick["away"]).split()[-1].lower()
+
+            # Пытаемся найти линию гандикапа в selection (например, "-3.5")
+            line = None
+            for token in pick["selection"].split():
+                try:
+                    line = float(token)
+                    break
+                except ValueError:
+                    continue
+
+            # Ищем спред с этой линией
+            if line is not None:
+                spreads = main.get("spreads") or {}
+                spread_key = str(line)
+                spread = spreads.get(spread_key) or {}
+                if spread:
+                    if home_last in sel_lower:
+                        market_odd = spread.get("home")
+                    elif away_last in sel_lower:
+                        market_odd = spread.get("away")
+
+            # Если спред не нашли — пробуем money_line (если он есть)
+            if market_odd is None:
+                ml = main.get("money_line")
+                if isinstance(ml, dict):
+                    if home_last in sel_lower:
+                        market_odd = ml.get("home")
+                    elif away_last in sel_lower:
+                        market_odd = ml.get("away")
+
+        # Расчёт value: prob × odd - 1
+        prob = pick.get("probability")
+        if prob is not None and market_odd:
+            value = (prob / 100.0) * market_odd - 1
+
+        pick["market_odd"] = market_odd
+        pick["value"] = value
+        pick["match_found"] = match_found is not None
+
+    return all_picks, None
     
 def source_status():
     out = {}
