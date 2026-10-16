@@ -553,7 +553,7 @@ import pandas as pd
 
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
-    """Скачивает Elo-рейтинги с Tennis Abstract."""
+    """Скачивает Elo-рейтинги с Tennis Abstract для ATP или WTA."""
     if tour not in ("atp", "wta"):
         return {}, "Тур должен быть 'atp' или 'wta'"
 
