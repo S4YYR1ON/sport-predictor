@@ -430,40 +430,14 @@ def get_pinnapi_tennis_events():
 
     try:
         api = PinnapiClient(api_key)
-        # sport_id=2 — теннис
         fixtures = api.prematch_fixtures(sport_id=SPORTS["tennis"])
-        
-        events = []
-        for fixture in fixtures:
-            home = fixture.get("home")
-            away = fixture.get("away")
-            if not home or not away:
-                continue
 
-            odds_home = None
-            odds_away = None
-            
-            # Ищем рынок Moneyline в списке markets
-            markets = fixture.get("markets", [])
-            for market in markets:
-                if market.get("type") == "moneyline":
-                    for price in market.get("prices", []):
-                        if price.get("designation") == "home":
-                            odds_home = price.get("price")
-                        elif price.get("designation") == "away":
-                            odds_away = price.get("price")
-                    break
+        # 🔍 Отладка: показываем тип и структуру ответа
+        st.write("**🔍 Отладка Pinnapi:**")
+        st.write(f"Тип ответа: `{type(fixtures).__name__}`")
+        st.json(fixtures if isinstance(fixtures, (list, dict)) else str(fixtures)[:1000])
 
-            events.append({
-                "home": home,
-                "away": away,
-                "start": fixture.get("startTime", ""),
-                "source": "Pinnapi · Pinnacle (Moneyline)",
-                "odds_home": odds_home,
-                "odds_away": odds_away,
-                "match_id": fixture.get("id"),
-            })
-        return events, None
+        return None, "Отладка: смотри вывод выше."
     except Exception as e:
         return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
         
