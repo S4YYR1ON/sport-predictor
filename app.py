@@ -252,8 +252,26 @@ elif page == "Матчи и прогнозы":
                                         e["odds_home"] = odds_home
                                         e["odds_away"] = odds_away
                                 
-                                # Загружаем Elo-рейтинги (кэш 24 часа)
-                                elo_dict, _ = get_elo_ratings(tour="atp" if sport == "tennis" else "atp")
+                                # Определяем тур по названию лиги
+                                league = (e.get("league_name") or "").upper()
+                                if "WTA" in league:
+                                    tour_key = "wta"
+                                elif "ATP" in league:
+                                    tour_key = "atp"
+                                else:
+                                    tour_key = "atp"  # fallback
+                                
+                                elo_dict, _ = get_elo_ratings(tour=tour_key)
+                                
+                                # Если игрок не найден в основном туре — пробуем другой тур
+                                from sources import find_elo_player
+                                if not (find_elo_player(elo_dict, e.get("home", "")) and find_elo_player(elo_dict, e.get("away", ""))):
+                                    alt_tour = "wta" if tour_key == "atp" else "atp"
+                                    alt_elo, _ = get_elo_ratings(tour=alt_tour)
+                                    # Если в альтернативном туре нашлись оба игрока — используем его
+                                    if (find_elo_player(alt_elo, e.get("home", "")) and find_elo_player(alt_elo, e.get("away", ""))):
+                                        elo_dict = alt_elo
+                                
                                 p = predict(sport, e, elo_dict=elo_dict)
                                 pid = save_prediction(sport, f"{e['home']} — {e['away']}", p["selection"], p["probability"], p["odds"], p["explanation"], p["confidence"])
                                 st.session_state["last_result"] = {"event": e, "p": p, "id": pid, "sport": sport, "odds_error": odds_error}
