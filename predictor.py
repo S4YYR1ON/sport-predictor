@@ -43,10 +43,10 @@ def adjust_with_stats(prob_home, stats):
         h2h_diff = (h2h["a_wins"] - h2h["b_wins"]) / h2h["total"]
         adj += 0.02 * h2h_diff
 
-    # 3. Отдых (до ±2%)
+    # 3. Отдых (до ±2%) — только если данные свежие
     rh = home.get("rest")
     ra = away.get("rest")
-    if rh is not None and ra is not None:
+    if rh is not None and ra is not None and rh < 30 and ra < 30:
         diff = max(-7, min(7, rh - ra))
         adj += 0.003 * diff
 
