@@ -82,6 +82,8 @@ if page == "Матчи и прогнозы":
                         st.write("**Надёжность данных:**", p["confidence"])
                         st.write("**Объяснение:**", p["explanation"])
                         st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
+                        if r.get("odds_error"):
+                            st.warning(f"⚠️ Коэффициенты не получены: {r['odds_error']}")
     
 
 elif page == "Добавить матч вручную":
