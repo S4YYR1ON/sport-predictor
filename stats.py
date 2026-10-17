@@ -224,21 +224,26 @@ def get_surface_winrate(df, player_name, surface):
     player_matches = _find_player_matches(df, player_name)
     if player_matches.empty:
         return None
-    surface_matches = player_matches[player_matches["surface"] == surface]
-    if surface_matches.empty:
+        
+    # Приводим колонку из CSV и искомое покрытие к нижнему регистру
+    surface_lower = surface.lower()
+    matches_surface = player_matches[player_matches["surface"].str.lower() == surface_lower]
+    
+    if matches_surface.empty:
         return None
+        
     last = _last_name(player_name)
     wins = int(
-        surface_matches["winner_name"]
+        matches_surface["winner_name"]
         .fillna("")
         .str.lower()
         .str.contains(last, regex=False)
         .sum()
     )
     return {
-        "matches": len(surface_matches),
+        "matches": len(matches_surface),
         "wins": wins,
-        "win_rate": wins / len(surface_matches),
+        "win_rate": wins / len(matches_surface),
     }
 
 
