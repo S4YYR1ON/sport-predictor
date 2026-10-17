@@ -154,6 +154,7 @@ def get_rest_days(df, player_name, before_date=None):
     return (before - past["tourney_date"].max()).days
 @st.cache_data(ttl=3600, show_spinner=False)
 
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_live_rest_days(player_name, match_date, tour="atp"):
     """
@@ -164,7 +165,6 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
         return None
 
     try:
-        # Парсим дату матча (убираем таймзону)
         md = pd.Timestamp(match_date)
         if md.tz is not None:
             md = md.tz_convert('UTC').tz_localize(None)
@@ -172,7 +172,7 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
     except Exception:
         return None
 
-    # Разбиваем имя игрока для строгой проверки
+    # Готовим имя для поиска
     our_parts = player_name.strip().split()
     if not our_parts:
         return None
@@ -181,7 +181,6 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
 
     # Проверяем последние 14 дней ДО даты матча
     for i in range(1, 15):
-        # 1. Сначала считаем дату и делаем запрос
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
         
@@ -195,33 +194,35 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
             data = r.json()
             events = data.get("events", [])
             
-            # 2. Проваливаемся в структуру JSON
             for ev in events:
                 groupings = ev.get("groupings", [])
                 for group in groupings:
                     competitions = group.get("competitions", [])
                     
                     for comp in competitions:
-                        # 3. ТУТ ФИЛЬТР ПАРНЫХ МАТЧЕЙ
                         comp_type = comp.get("type", {}).get("text", "").lower()
                         if "doubles" in comp_type:
                             continue
                             
-                        # 4. Ищем игрока
                         for competitor in comp.get("competitors", []):
                             athlete = competitor.get("athlete", {})
                             
-                            espn_last_name = str(athlete.get("lastName", "")).lower()
-                            espn_display_name = str(athlete.get("displayName", "")).lower()
+                            # Собираем все возможные варианты имени от ESPN
+                            names_to_check = [
+                                str(athlete.get("displayName", "")).lower(),
+                                str(athlete.get("shortName", "")).lower(),
+                                str(athlete.get("fullName", "")).lower(),
+                                str(athlete.get("lastName", "")).lower()
+                            ]
+                            combined_name = " ".join(names_to_check)
                             
-                            # СТРОГАЯ ПРОВЕРКА: фамилия совпадает + первая буква имени (если есть)
-                            if our_last == espn_last_name:
-                                if not our_first_initial or our_first_initial in espn_display_name:
-                                    return i # Нашли матч, возвращаем дни отдыха
+                            # Проверяем: есть ли наша фамилия и первая буква имени
+                            if our_last in combined_name:
+                                if not our_first_initial or our_first_initial in combined_name:
+                                    return i
         except Exception:
             continue
 
-    # Если за 14 дней ничего не нашли
     return None
 
 def get_surface_winrate(df, player_name, surface):
