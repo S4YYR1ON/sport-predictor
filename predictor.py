@@ -109,6 +109,10 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
 def predict(sport, event, elo_dict=None, surface="hard", stats=None):
     a = event.get("home", "Участник A")
     b = event.get("away", "Участник B")
+    
+    # Определяем тур для правильных ML-весов
+    league_name = (event.get("league_name") or "").lower()
+    tour_key = "wta" if "wta" in league_name else "atp"
 
     # ===== Elo + калибровка + корректировка =====
     if elo_dict:
@@ -120,6 +124,8 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             )
             elo_a_val = elo_a.get(surface_key) if isinstance(elo_a, dict) else elo_a
             elo_b_val = elo_b.get(surface_key) if isinstance(elo_b, dict) else elo_b
+            
+            # Если данных по покрытию нет, берем общий Elo
             if not elo_a_val or not elo_b_val or pd.isna(elo_a_val) or pd.isna(elo_b_val):
                 elo_a_val = elo_a.get("elo") if isinstance(elo_a, dict) else elo_a
                 elo_b_val = elo_b.get("elo") if isinstance(elo_b, dict) else elo_b
@@ -127,8 +133,12 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             if elo_a_val and elo_b_val:
                 prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
                 prob_a = calibrate(prob_a)
-                tour_key = "wta" if "wta" in event.get("league_name", "").lower() else "atp"
+                
+                # Вот здесь мы применяем ML-веса
                 prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
+                
+                # ВОТ ОНА, ТА САМАЯ ПРОПАВШАЯ СТРОЧКА
+                prob_b = 1 - prob_a
 
                 if prob_a >= prob_b:
                     selection = f"Победа {a}"
@@ -144,13 +154,13 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                 )
                 explanation = (
                     f"Прогноз на основе Elo-рейтингов Tennis Abstract ({surface_ru}) "
-                    f"с калибровкой и корректировкой по форме/H2H/отдыху/покрытию. "
+                    f"с калибровкой и корректировкой по ML-весам. "
                     f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
                     f"Вероятность победы {fav} — {probability:.1%}, "
                     f"{dog} — {1 - probability:.1%}. "
                     f"Корректировка: {adj:+.1%}."
                 )
-                confidence = f"средняя — Elo + калибровка + все факторы ({surface_ru})"
+                confidence = f"средняя — Elo + ML-корректировки ({surface_ru})"
 
                 return {
                     "selection": selection,
@@ -163,7 +173,7 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                     "adjustment": adj,
                 }
 
-    # ===== Fallback =====
+    # ===== Fallback (если нет Elo) =====
     try:
         oa = float(event.get("odds_home")) if event.get("odds_home") else None
     except (TypeError, ValueError):
