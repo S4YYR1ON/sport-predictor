@@ -174,9 +174,14 @@ elif page == "Матчи и прогнозы":
     with col_f2:
         tour_filter = st.selectbox(
             "Фильтр турниров",
-            ["Все турниры", "Только топ (ATP/WTA)"],
+            ["Все турниры", "Только топ (ATP/WTA)", "Только ITF/Challenger"],
         )
-        tour_filter_key = "top" if tour_filter == "Только топ (ATP/WTA)" else "all"
+        if tour_filter == "Только топ (ATP/WTA)":
+            tour_filter_key = "top"
+        elif tour_filter == "Только ITF/Challenger":
+            tour_filter_key = "itf"
+        else:
+            tour_filter_key = "all"
 
     st.subheader(sport_label)
 
@@ -268,10 +273,19 @@ elif page == "Матчи и прогнозы":
 
                         st.divider()
                         st.markdown("### Результат анализа")
+                        
+                        # ЦВЕТОВОЕ ВЫДЕЛЕНИЕ СТАТУСА
+                        confidence_text = p.get("confidence", "")
+                        if "Pinnacle" in confidence_text or "нет независимой модели" in confidence_text:
+                            st.warning("⚠️ **Режим рынка (Pinnacle):** Нет Elo-рейтинга. Вероятность рассчитана на основе кэфов букмекера.")
+                        else:
+                            st.success("✅ **Режим модели (Elo + ML):** Вероятность рассчитана с учетом рейтингов, формы и H2H.")
+                            
                         a, b, c = st.columns(3)
                         a.metric("Исход модели", p["selection"])
                         b.metric("Оценка вероятности", f"{p['probability']:.1%}")
                         c.metric("Справедливый коэффициент", f"{p['fair_odds']:.2f}")
+                        
                         st.write("**Надёжность данных:**", p["confidence"])
                         st.write("**Объяснение:**", p["explanation"])
                         st.caption(f"Сохранено как виртуальный прогноз №{r['id']}.")
