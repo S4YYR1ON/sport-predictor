@@ -224,22 +224,24 @@ def get_surface_winrate(df, player_name, surface):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_sofascore_form(player_name):
-    """
-    Бесплатный парсинг истории игрока через открытое API Sofascore.
-    Отлично подходит для ITF и Challenger.
-    """
     if not player_name:
         return None
         
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
     }
     
+    # Берем только фамилию для поиска (например, "Gentzsch" вместо "Tom Gentzsch")
+    last_name = player_name.strip().split()[-1]
+    
     try:
-        # 1. Ищем игрока, чтобы получить его ID
-        search_url = f"https://api.sofascore.com/api/v1/search/all?q={requests.utils.quote(player_name)}"
+        # 1. Ищем игрока
+        search_url = f"https://api.sofascore.com/api/v1/search/all?q={requests.utils.quote(last_name)}"
         r_search = requests.get(search_url, headers=headers, timeout=10)
+        
         if r_search.status_code != 200:
+            print(f"Sofascore search error: {r_search.status_code}") # Выведет в консоль
             return None
             
         search_data = r_search.json()
@@ -247,18 +249,23 @@ def get_sofascore_form(player_name):
         
         player_id = None
         for item in results:
+            # Ищем тип 'player' и проверяем, что имя похоже на наше
             if item.get("type") == "player":
-                # Берем первое совпадение (можно улучшить, сравнивая фамилии)
-                player_id = item.get("entity", {}).get("id")
-                break
+                found_name = item.get("entity", {}).get("name", "").lower()
+                if last_name.lower() in found_name:
+                    player_id = item.get("entity", {}).get("id")
+                    break
                 
         if not player_id:
+            print(f"Sofascore: Player {player_name} not found")
             return None
             
-        # 2. Получаем последние матчи игрока (0 - значит все последние)
+        # 2. Получаем последние матчи
         matches_url = f"https://api.sofascore.com/api/v1/team/{player_id}/events/last/0"
         r_matches = requests.get(matches_url, headers=headers, timeout=10)
+        
         if r_matches.status_code != 200:
+            print(f"Sofascore matches error: {r_matches.status_code}")
             return None
             
         matches_data = r_matches.json()
@@ -267,17 +274,14 @@ def get_sofascore_form(player_name):
         wins = 0
         total = 0
         
-        for ev in reversed(events): # Идем от старых к новым
+        for ev in reversed(events):
             if ev.get("status", {}).get("type") != "finished":
                 continue
                 
-            # В теннисе Sofascore использует homeScore/awayScore для сетов, 
-            # а winnerCode = 1 (домашний), 2 (гостевой)
             winner_code = ev.get("winnerCode")
             if not winner_code:
                 continue
                 
-            # Проверяем, был ли наш игрок домашним или гостевым
             is_home = ev.get("homeTeam", {}).get("id") == player_id
             is_away = ev.get("awayTeam", {}).get("id") == player_id
             
@@ -292,6 +296,7 @@ def get_sofascore_form(player_name):
                 break
                 
         if total == 0:
+            print(f"Sofascore: No finished matches for {player_name}")
             return None
             
         return {
@@ -303,9 +308,8 @@ def get_sofascore_form(player_name):
         }
         
     except Exception as e:
-        # Если API упал (например, заблокировал IP), тихо возвращаем None
+        print(f"Sofascore exception: {e}")
         return None
-
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
