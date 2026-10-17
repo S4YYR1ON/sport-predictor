@@ -157,7 +157,6 @@ def get_rest_days(df, player_name, before_date=None):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_espn_day(date_str, tour):
-    """Скачивает табло ESPN за конкретный день и кэширует его на 24 часа."""
     url = f"https://site.api.espn.com/apis/site/v2/sports/tennis/{tour}/scoreboard?dates={date_str}"
     try:
         r = requests.get(url, timeout=10)
@@ -169,10 +168,6 @@ def fetch_espn_day(date_str, tour):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_live_rest_days(player_name, match_date, tour="atp"):
-    """
-    Ищет реальные дни отдыха через ESPN.
-    Возвращает int (дни) или None (если данных нет).
-    """
     if not player_name or not match_date:
         return None
 
@@ -185,17 +180,17 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
         return None
 
     our_parts = player_name.strip().split()
-    if not our_parts:
+    if len(our_parts) < 2:
         return None
+        
     our_last = our_parts[-1].lower()
-    our_first_initial = our_parts[0][0].lower() if len(our_parts) > 1 else ""
+    our_first = our_parts[0].lower() # Берем полное имя, а не первую букву
 
     # Проверяем последние 14 дней ДО даты матча
     for i in range(1, 15):
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
         
-        # Используем кэшированную функцию (вместо прямого requests.get)
         data = fetch_espn_day(date_str, tour)
         if not data:
             continue
@@ -215,18 +210,17 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
                     for competitor in comp.get("competitors", []):
                         athlete = competitor.get("athlete", {})
                         
-                        names_to_check = [
-                            str(athlete.get("displayName", "")).lower(),
-                            str(athlete.get("shortName", "")).lower(),
-                            str(athlete.get("fullName", "")).lower(),
-                            str(athlete.get("lastName", "")).lower()
-                        ]
-                        combined_name = " ".join(names_to_check)
+                        # Собираем все возможные варианты
+                        display_name = str(athlete.get("displayName", "")).lower()
+                        short_name = str(athlete.get("shortName", "")).lower()
                         
-                        if our_last in combined_name:
-                            if not our_first_initial or our_first_initial in combined_name:
+                        # Строгая проверка: фамилия должна быть в имени, 
+                        # И либо полное имя, либо первая буква имени должны совпадать
+                        if our_last in display_name or our_last in short_name:
+                            if our_first in display_name or our_first[0] in display_name or our_first in short_name:
+                                # ВРЕМЕННАЯ ОТЛАДКА: чтобы мы видели, кого он нашел
+                                st.toast(f"Найден отдых для {player_name}: {i} дн. (совпал с {display_name})")
                                 return i
-
     return None
 
 
