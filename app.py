@@ -18,29 +18,42 @@ st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide"
 # --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
 st.markdown("""
 <style>
-    /* Убираем стандартные кружочки радио-кнопок */
+    /* 1. Скрываем стандартные кружочки */
     div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
         display: none !important;
     }
     
-    /* Увеличиваем текст, делаем его жирным и меняем цвет */
-    div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        color: #FAFAFA !important; 
-        transition: color 0.2s ease-in-out;
-    }
-    
-    /* Красивое выделение синим цветом при наведении мыши */
-    div[data-testid="stRadio"] div[role="radiogroup"] label:hover p {
-        color: #1f77b4 !important;
-        cursor: pointer;
-    }
-    
-    /* Добавляем отступы между пунктами меню, чтобы они не слипались */
+    /* 2. Делаем из пункта меню прямоугольную кнопку */
     div[data-testid="stRadio"] div[role="radiogroup"] label {
-        padding: 10px 0 !important;
-        border-bottom: 1px solid #262730; /* Тонкая линия-разделитель */
+        padding: 12px 20px !important;
+        margin-bottom: 5px !important;
+        border-radius: 8px !important;
+        background-color: transparent !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    /* 3. Стилизуем текст */
+    div[data-testid="stRadio"] div[role="radiogroup"] label p {
+        font-size: 1.15rem !important;
+        font-weight: 600 !important;
+        color: #FAFAFA !important;
+        margin: 0 !important;
+    }
+    
+    /* 4. Эффект при наведении мыши (легкий серый фон) */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+        background-color: #262730 !important;
+    }
+    
+    /* 5. Выделение выбранного пункта (синий фон и белый текст) */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+        background-color: #1f77b4 !important;
+    }
+    
+    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
     }
 </style>
 """, unsafe_allow_html=True)
