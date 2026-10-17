@@ -343,14 +343,14 @@ def get_apisports_form(player_name):
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
     df = load_matches(tour=tour)
     
-    # 1. Отдых (ESPN + Sackmann)
+    # 1. Отдых (ESPN для топов -> Sackmann для остальных)
     live_rest_home = get_live_rest_days(home_name, match_date, tour)
     live_rest_away = get_live_rest_days(away_name, match_date, tour)
     
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
     rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
 
-    # 2. Форма (только из Sackmann)
+    # 2. Форма (только из Sackmann - включая ITF)
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
 
@@ -362,6 +362,7 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     h2h_home = get_h2h(df, home_name, away_name)
     h2h_away = get_h2h(df, away_name, home_name)
 
+    # Если вообще ничего нет — возвращаем None
     if df.empty and (live_rest_home is None and live_rest_away is None):
         return None
 
