@@ -54,20 +54,20 @@ def get_flashscore_form(player_name):
         
     last_name = player_name.strip().split()[-1].lower()
     
-    # Ищем матчи, где игрок был Player 1 или Player 2
-    # В CSV колонки называются "Player 1" и "Player 2", а внутри лежат словари с именем
-    # Но судя по скрину, колонка может называться просто "Player 1" и содержать строку.
-    # Напишем безопасный поиск.
+    # Проверяем, какие колонки есть в CSV, чтобы не упасть с ошибкой
+    p1_col = "Player 1" if "Player 1" in df.columns else df.columns[3] # запасной вариант
+    p2_col = "Player 2" if "Player 2" in df.columns else df.columns[5]
+    winner_col = "Winner" if "Winner" in df.columns else df.columns[-2]
     
     player_matches = []
     for _, row in df.iterrows():
-        p1 = str(row.get("Player 1", "")).lower()
-        p2 = str(row.get("Player 2", "")).lower()
+        p1 = str(row.get(p1_col, "")).lower()
+        p2 = str(row.get(p2_col, "")).lower()
         
         if last_name in p1:
-            player_matches.append({"won": row.get("Winner") == "home"})
+            player_matches.append({"won": str(row.get(winner_col)).lower() == "home"})
         elif last_name in p2:
-            player_matches.append({"won": row.get("Winner") == "away"})
+            player_matches.append({"won": str(row.get(winner_col)).lower() == "away"})
             
     if not player_matches:
         return None
