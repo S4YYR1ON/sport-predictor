@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import requests
 import streamlit as st
@@ -31,6 +32,58 @@ def load_matches(tour="atp", years=(2021, 2022, 2023, 2024, 2025, 2026)):
     df = df.sort_values("tourney_date").reset_index(drop=True)
     return df
 
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_flashscore_history():
+    """Читает локальный CSV с историей от Apify."""
+    if not os.path.exists("flashscore_history.csv"):
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv("flashscore_history.csv")
+        # Приводим даты к единому формату
+        df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce")
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+def get_flashscore_form(player_name):
+    """Считает форму по данным из Flashscore."""
+    df = load_flashscore_history()
+    if df.empty:
+        return None
+        
+    last_name = player_name.strip().split()[-1].lower()
+    
+    # Ищем матчи, где игрок был Player 1 или Player 2
+    # В CSV колонки называются "Player 1" и "Player 2", а внутри лежат словари с именем
+    # Но судя по скрину, колонка может называться просто "Player 1" и содержать строку.
+    # Напишем безопасный поиск.
+    
+    player_matches = []
+    for _, row in df.iterrows():
+        p1 = str(row.get("Player 1", "")).lower()
+        p2 = str(row.get("Player 2", "")).lower()
+        
+        if last_name in p1:
+            player_matches.append({"won": row.get("Winner") == "home"})
+        elif last_name in p2:
+            player_matches.append({"won": row.get("Winner") == "away"})
+            
+    if not player_matches:
+        return None
+        
+    last_10 = player_matches[-10:]
+    wins = sum(1 for m in last_10 if m["won"])
+    total = len(last_10)
+    
+    return {
+        "matches": total,
+        "wins": wins,
+        "losses": total - wins,
+        "win_rate": wins / total,
+        "insufficient_data": False
+    }
+    
 
 def _last_name(name):
     if not name:
@@ -308,34 +361,27 @@ def get_apisports_form(player_name):
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
     df = load_matches(tour=tour)
     
-    # 1. Отдых (ESPN + Sackmann)
+    # 1. Отдых
     live_rest_home = get_live_rest_days(home_name, match_date, tour)
     live_rest_away = get_live_rest_days(away_name, match_date, tour)
-    
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
     rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
 
-    # 2. Форма (Sackmann -> Sofascore -> Пусто)
+    # 2. Форма (Sackmann -> Flashscore -> Пусто)
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
     
-    # Если в Sackmann пусто или мало матчей, идем в API-Sports
     if not form_home or form_home.get("insufficient_data"):
-        api_home = get_apisports_form(home_name)
-        if api_home:
-            form_home = api_home
+        fs_home = get_flashscore_form(home_name)
+        if fs_home: form_home = fs_home
             
     if not form_away or form_away.get("insufficient_data"):
-        api_away = get_apisports_form(away_name)
-        if api_away:
-            form_away = api_away
+        fs_away = get_flashscore_form(away_name)
+        if fs_away: form_away = fs_away
 
-    # 3. Покрытие (Оставим только Sackmann, так как Sofascore сложнее парсить по покрытиям)
+    # 3. Покрытие (оставляем Sackmann)
     surface_home = get_surface_winrate(df, home_name, surface)
     surface_away = get_surface_winrate(df, away_name, surface)
-
-    if df.empty and (live_rest_home is None and live_rest_away is None) and not form_home and not form_away:
-        return None
 
     return {
         "home": {
