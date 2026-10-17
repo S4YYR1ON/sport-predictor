@@ -19,8 +19,9 @@ def fetch_data():
     client = ApifyClient(APIFY_TOKEN)
     
     # Последние 3 дня (чтобы наверстать пропущенное, если робот упал)
+    # Временно ставим 30 дней для глубокой загрузки (бэкфилл)
     days_list = []
-    for i in range(3):
+    for i in range(30):
         date_str = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
         days_list.append(date_str)
     
