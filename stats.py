@@ -52,26 +52,26 @@ def get_flashscore_form(player_name):
     if df.empty:
         return None
         
+    # Берем фамилию игрока (последнее слово) и переводим в нижний регистр
     last_name = player_name.strip().split()[-1].lower()
-    
-    # Проверяем, какие колонки есть в CSV, чтобы не упасть с ошибкой
-    p1_col = "Player 1" if "Player 1" in df.columns else df.columns[3] # запасной вариант
-    p2_col = "Player 2" if "Player 2" in df.columns else df.columns[5]
-    winner_col = "Winner" if "Winner" in df.columns else df.columns[-2]
     
     player_matches = []
     for _, row in df.iterrows():
-        p1 = str(row.get(p1_col, "")).lower()
-        p2 = str(row.get(p2_col, "")).lower()
+        # Читаем колонки "home", "away" и "winner" из CSV
+        home_str = str(row.get("home", "")).lower()
+        away_str = str(row.get("away", "")).lower()
+        winner_str = str(row.get("winner", "")).lower()
         
-        if last_name in p1:
-            player_matches.append({"won": str(row.get(winner_col)).lower() == "home"})
-        elif last_name in p2:
-            player_matches.append({"won": str(row.get(winner_col)).lower() == "away"})
+        # Проверяем, есть ли наша фамилия в строке (словаре) с домашним или гостевым игроком
+        if last_name in home_str:
+            player_matches.append({"won": winner_str == "home"})
+        elif last_name in away_str:
+            player_matches.append({"won": winner_str == "away"})
             
     if not player_matches:
         return None
         
+    # Берем последние 10 матчей
     last_10 = player_matches[-10:]
     wins = sum(1 for m in last_10 if m["won"])
     total = len(last_10)
