@@ -15,47 +15,50 @@ from sources import (
 from stats import compute_match_stats
 
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
-# --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
-# --- СТИЛИЗАЦИЯ КНОПОК НАВИГАЦИИ ---
+# --- СТИЛИЗАЦИЯ КНОПОК НАВИГАЦИИ (ПОЛНАЯ ШИРИНА) ---
 st.markdown("""
 <style>
-    /* 1. Настраиваем все кнопки в сайдбаре */
+    /* 1. Заставляем контейнеры кнопок вылезти за отступы сайдбара */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] {
+        margin-left: -1.5rem !important; /* Сдвигаем влево */
+        margin-right: -1.5rem !important; /* Сдвигаем вправо */
+        width: calc(100% + 3rem) !important; /* Растягиваем на всю ширину */
+        margin-bottom: 0 !important; /* Убираем отступы между кнопками */
+    }
+
+    /* 2. Настраиваем сами кнопки (убираем скругления и рамки) */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-        justify-content: flex-start !important; /* Выравниваем текст влево */
-        padding-left: 15px !important; /* Отступ слева */
-        border-radius: 6px !important; /* Слегка скругляем углы */
+        justify-content: flex-start !important; /* Текст влево */
+        padding: 15px 20px !important; /* Внутренние отступы для текста */
+        border-radius: 0 !important; /* Никаких скруглений */
+        border: none !important; /* Никаких рамок */
+        border-bottom: 1px solid #333 !important; /* Тонкая полоска-разделитель снизу */
+        box-shadow: none !important; 
+        width: 100% !important;
         font-weight: 600 !important;
         font-size: 1.05rem !important;
-        width: 100% !important;
-        border: 1px solid #333 !important;
         transition: all 0.2s ease !important;
     }
 
-    /* 2. Неактивные кнопки (серые) */
+    /* 3. Неактивные кнопки */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"] {
         background-color: transparent !important;
         color: #FAFAFA !important;
-        border-color: #444 !important;
     }
 
-    /* 3. Эффект при наведении на неактивную кнопку */
+    /* 4. Наведение на неактивную кнопку */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
         background-color: #262730 !important;
-        border-color: #1f77b4 !important;
         color: #1f77b4 !important;
+        border-left: 4px solid #1f77b4 !important; /* Красивая синяя полоска слева при наведении */
     }
 
-    /* 4. Активная кнопка (синяя плашка) */
+    /* 5. Активная кнопка (синяя плашка на всю ширину) */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
         background-color: #1f77b4 !important;
         color: #FFFFFF !important;
-        border: 1px solid #1f77b4 !important;
-    }
-    
-    /* 5. Убираем стандартный фокус (обводку) при клике */
-    section[data-testid="stSidebar"] div[data-testid="stButton"] > button:focus {
-        box-shadow: none !important;
-        outline: none !important;
+        border-bottom: 1px solid #1f77b4 !important;
+        border-left: 4px solid #1f77b4 !important; /* Акцентная полоска слева */
     }
 </style>
 """, unsafe_allow_html=True)
