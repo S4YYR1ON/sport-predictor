@@ -249,18 +249,22 @@ def get_espn_events(sport):
 
 def get_events(sport, region="all", tour_filter="all"):
     if sport == "tennis":
-        # Временно возвращаем заглушку для тенниса, если Pinnapi не работает
-        # return [], "Pinnapi временно отключен"
-        
-        # Раскомментируй это, когда настроишь запросы к Pinnapi
         events, error = get_pinnapi_tennis_events()
         if events:
             if region == "europe":
                 events = [e for e in events if is_european_league(e.get("league_name", ""))]
+            
+            # НОВАЯ ЛОГИКА ФИЛЬТРАЦИИ
             if tour_filter == "top":
                 events = [e for e in events if is_top_tournament(e.get("league_name", ""))]
+            elif tour_filter == "itf":
+                # Оставляем только те, которые НЕ попали в топ
+                events = [e for e in events if not is_top_tournament(e.get("league_name", ""))]
+                
             return events, f"Источник: Pinnapi (Pinnacle). Найдено матчей: {len(events)}."
         return [], f"Pinnapi недоступен: {error}"
+    
+    # ... остальной код для других видов спорта
 
     if sport == "football":
         return get_espn_events("football")
