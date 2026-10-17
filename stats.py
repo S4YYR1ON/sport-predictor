@@ -11,20 +11,39 @@ SACKMANN_BASE = "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-arc
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_matches(tour="atp", years=(2021, 2022, 2023, 2024, 2025, 2026)):
-    """Загружает матчи ATP/WTA из архива Sackmann."""
+    """Загружает матчи ATP/WTA (основной тур + Челленджеры/ITF) из архива Sackmann."""
     all_matches = []
     base = f"{SACKMANN_BASE}/{tour}"
+    
     for year in years:
-        url = f"{base}/{tour}_matches_{year}.csv"
-        try:
-            r = requests.get(url, timeout=25)
-            r.raise_for_status()
-            df = pd.read_csv(StringIO(r.text), low_memory=False)
-            all_matches.append(df)
-        except Exception:
-            continue
+        # Определяем список файлов для загрузки в зависимости от тура
+        if tour == "atp":
+            files_to_load = [
+                f"{tour}_matches_{year}.csv",             # Основной тур
+                f"{tour}_matches_qual_chall_{year}.csv",  # Квалификация и Челленджеры
+                f"{tour}_matches_futures_{year}.csv"      # ITF / Фьючерсы
+            ]
+        else: # wta
+            files_to_load = [
+                f"{tour}_matches_{year}.csv",             # Основной тур
+                f"{tour}_matches_qual_itf_{year}.csv"     # Квалификация и ITF
+            ]
+            
+        for filename in files_to_load:
+            url = f"{base}/{filename}"
+            try:
+                r = requests.get(url, timeout=25)
+                r.raise_for_status()
+                df = pd.read_csv(StringIO(r.text), low_memory=False)
+                all_matches.append(df)
+            except Exception:
+                # Если файла за этот год нет (например, futures за 2026 еще не готов),
+                # просто пропускаем его и идем дальше
+                continue
+                
     if not all_matches:
         return pd.DataFrame()
+        
     df = pd.concat(all_matches, ignore_index=True)
     df["tourney_date"] = pd.to_datetime(
         df["tourney_date"], format="%Y%m%d", errors="coerce"
