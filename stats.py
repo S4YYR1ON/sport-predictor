@@ -224,58 +224,60 @@ def get_surface_winrate(df, player_name, surface):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_apisports_form(player_name):
-    """
-    Получает форму игрока через API-Sports (Бесплатный тариф: 100 запросов/день).
-    Отлично работает на Streamlit Cloud без блокировок.
-    """
     try:
         api_key = st.secrets["API_SPORTS_KEY"]
     except (KeyError, FileNotFoundError):
+        st.error("❌ ОШИБКА: Ключ API_SPORTS_KEY не найден в secrets.toml!")
         return None
         
     headers = {"x-apisports-key": api_key}
     base_url = "https://v1.tennis.api-sports.io"
     
     try:
-        # 1. Ищем игрока по имени
+        # 1. Ищем игрока
         search_url = f"{base_url}/players"
         r_search = requests.get(search_url, headers=headers, params={"search": player_name}, timeout=10)
+        
         if r_search.status_code != 200:
+            st.error(f"❌ API-Sports вернул ошибку поиска: {r_search.status_code}. Ответ: {r_search.text}")
             return None
             
         search_data = r_search.json()
         players = search_data.get("response", [])
         if not players:
+            st.warning(f"⚠️ API-Sports не нашел игрока: {player_name}")
             return None
             
         player_id = players[0].get("id")
         if not player_id:
             return None
             
-        # 2. Запрашиваем матчи текущего сезона
+        # 2. Запрашиваем матчи
         current_year = datetime.now().year
         games_url = f"{base_url}/games"
         r_games = requests.get(games_url, headers=headers, params={"player": player_id, "season": current_year}, timeout=10)
         
         if r_games.status_code != 200:
+            st.error(f"❌ API-Sports вернул ошибку матчей: {r_games.status_code}. Ответ: {r_games.text}")
             return None
             
         games_data = r_games.json()
         games = games_data.get("response", [])
         
+        if not games:
+            st.warning(f"⚠️ API-Sports не нашел матчей для {player_name} в {current_year} году")
+            return None
+            
         wins = 0
         total = 0
         
-        # Идем по матчам с конца (самые свежие)
         for game in reversed(games):
-            if game.get("status", {}).get("short") != "FT": # FT = Finished
+            if game.get("status", {}).get("short") != "FT":
                 continue
                 
-            # Определяем, был ли наш игрок домашним или гостевым
             home_id = game.get("players", {}).get("home", {}).get("id")
             away_id = game.get("players", {}).get("away", {}).get("id")
-            
-            winner = game.get("winner", "") # "Home" или "Away"
+            winner = game.get("winner", "")
             
             if home_id == player_id and winner == "Home":
                 wins += 1
@@ -287,6 +289,7 @@ def get_apisports_form(player_name):
                 break
                 
         if total == 0:
+            st.warning(f"⚠️ API-Sports: у {player_name} нет завершенных матчей (FT).")
             return None
             
         return {
@@ -298,6 +301,7 @@ def get_apisports_form(player_name):
         }
         
     except Exception as e:
+        st.error(f"❌ Ошибка в коде API-Sports: {str(e)}")
         return None
 
 @st.cache_data(ttl=86400, show_spinner=False)
