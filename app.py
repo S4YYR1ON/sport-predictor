@@ -15,12 +15,35 @@ from sources import (
 from stats import compute_match_stats
 
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
-# --- СТИЛИЗАЦИЯ КНОПОК НАВИГАЦИИ (ПОЛНАЯ ШИРИНА) ---
+# --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
 st.markdown("""
 <style>
+    /* 0. СТИЛИЗАЦИЯ ЗАГОЛОВКА "НАВИГАЦИЯ" И ЛИНИЯ ПОД НИМ */
+    section[data-testid="stSidebar"] h2 {
+        position: relative !important;
+        margin-top: 0px !important;
+        margin-bottom: 25px !important; /* Увеличиваем дистанцию до первой кнопки */
+        padding-bottom: 12px !important;
+        font-size: 1.8rem !important; /* Увеличиваем шрифт */
+        font-weight: 800 !important; /* Делаем жирным */
+        color: #FAFAFA !important;
+        letter-spacing: 1px !important;
+    }
+
+    /* Рисуем линию под заголовком с помощью псевдо-элемента */
+    section[data-testid="stSidebar"] h2::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: -1.5rem; /* Начинаем от самого левого края (как плашки) */
+        width: 85%; /* Линия не доходит до правого края */
+        height: 2px;
+        background-color: #1f77b4; /* Синий цвет */
+    }
+
     /* 1. УБИРАЕМ ЧЕРНЫЕ ПОЛОСЫ МЕЖДУ КНОПКАМИ */
     section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
-        gap: 0 !important; /* Убирает зазоры между блоками */
+        gap: 0 !important; 
     }
 
     /* 2. РАСТЯГИВАЕМ НА ВСЮ ШИРИНУ */
@@ -34,25 +57,25 @@ st.markdown("""
     /* 3. НАСТРАИВАЕМ КНОПКУ */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
         justify-content: flex-start !important; 
-        padding: 16px 20px !important; /* Чуть больше отступы для высоты */
+        padding: 16px 20px !important; 
         border-radius: 0 !important; 
         border: none !important; 
         border-bottom: 1px solid #333 !important; 
         box-shadow: none !important; 
         width: 100% !important;
-        min-height: 55px !important; /* Фиксируем высоту, чтобы текст стоял ровно */
+        min-height: 55px !important; 
         display: flex !important;
-        align-items: center !important; /* Центрируем текст по вертикали */
+        align-items: center !important; 
         transition: all 0.2s ease !important;
     }
 
-    /* 4. ТЕКСТ ВНУТРИ (Убираем кривые отступы и УВЕЛИЧИВАЕМ) */
+    /* 4. ТЕКСТ ВНУТРИ */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
-        font-size: 1.35rem !important; /* Сделали шрифт еще больше */
+        font-size: 1.35rem !important; 
         font-weight: 600 !important;
-        margin: 0 !important; /* Убираем кривой отступ снизу */
+        margin: 0 !important; 
         padding: 0 !important;
-        line-height: 1 !important; /* Идеальная высота строки */
+        line-height: 1 !important; 
         text-align: left !important;
     }
 
