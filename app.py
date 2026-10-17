@@ -283,8 +283,12 @@ elif page == "Матчи и прогнозы":
                                 with col_h:
                                     st.markdown(f"**{e['home']}**")
                                     fh = match_stats["home"].get("form") or {}
-                                    if fh:
+                                    if fh and fh.get("insufficient_data"):
+                                        st.caption("Форма (10): мало данных в архиве")
+                                    elif fh and fh.get("win_rate") is not None:
                                         st.write(f"Форма (10): **{fh['wins']}-{fh['losses']}** ({fh['win_rate']:.0%})")
+                                    else:
+                                        st.caption("Форма: нет данных")
                                     sh = match_stats["home"].get("surface") or {}
                                     if sh:
                                         st.write(f"Покрытие: **{sh['wins']}-{sh['matches'] - sh['wins']}** ({sh['win_rate']:.0%})")
