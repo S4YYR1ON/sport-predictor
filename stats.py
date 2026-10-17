@@ -84,6 +84,82 @@ def get_flashscore_form(player_name):
         "insufficient_data": False
     }
 
+def get_flashscore_h2h(player_a, player_b):
+    """Ищет личные встречи (H2H) в базе Flashscore."""
+    df = load_flashscore_history()
+    if df.empty:
+        return None
+        
+    a_last = player_a.strip().split()[-1].lower()
+    b_last = player_b.strip().split()[-1].lower()
+    
+    a_wins = 0
+    b_wins = 0
+    
+    for _, row in df.iterrows():
+        home_str = str(row.get("home", "")).lower()
+        away_str = str(row.get("away", "")).lower()
+        winner_str = str(row.get("winner", "")).lower()
+        
+        # Проверяем, встречались ли они
+        if a_last in home_str and b_last in away_str:
+            if winner_str == "home": a_wins += 1
+            elif winner_str == "away": b_wins += 1
+        elif b_last in home_str and a_last in away_str:
+            if winner_str == "home": b_wins += 1
+            elif winner_str == "away": a_wins += 1
+            
+    total = a_wins + b_wins
+    if total == 0:
+        return None
+        
+    return {"a_wins": a_wins, "b_wins": b_wins, "total": total}
+
+
+def get_flashscore_surface(player_name, target_surface):
+    """Считает винрейт на покрытии по базе Flashscore."""
+    df = load_flashscore_history()
+    if df.empty:
+        return None
+        
+    last_name = player_name.strip().split()[-1].lower()
+    
+    wins = 0
+    total = 0
+    
+    for _, row in df.iterrows():
+        comp_str = str(row.get("competition", "")).lower()
+        
+        # Определяем покрытие из названия турнира
+        match_surface = None
+        if "hard" in comp_str: match_surface = "hard"
+        elif "clay" in comp_str: match_surface = "clay"
+        elif "grass" in comp_str: match_surface = "grass"
+        elif "carpet" in comp_str: match_surface = "carpet"
+        
+        if match_surface != target_surface:
+            continue
+            
+        home_str = str(row.get("home", "")).lower()
+        away_str = str(row.get("away", "")).lower()
+        winner_str = str(row.get("winner", "")).lower()
+        
+        if last_name in home_str:
+            total += 1
+            if winner_str == "home": wins += 1
+        elif last_name in away_str:
+            total += 1
+            if winner_str == "away": wins += 1
+            
+    if total == 0:
+        return None
+        
+    return {
+        "matches": total,
+        "wins": wins,
+        "win_rate": wins / total
+    }
+
 
 def _last_name(name):
     if not name:
@@ -361,7 +437,7 @@ def get_apisports_form(player_name):
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
     df = load_matches(tour=tour)
     
-    # 1. Отдых
+    # 1. Отдых (ESPN + Sackmann)
     live_rest_home = get_live_rest_days(home_name, match_date, tour)
     live_rest_away = get_live_rest_days(away_name, match_date, tour)
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
@@ -379,20 +455,37 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
         fs_away = get_flashscore_form(away_name)
         if fs_away: form_away = fs_away
 
-    # 3. Покрытие (оставляем Sackmann)
+    # 3. Покрытие (Sackmann -> Flashscore -> Пусто)
     surface_home = get_surface_winrate(df, home_name, surface)
     surface_away = get_surface_winrate(df, away_name, surface)
+    
+    if not surface_home:
+        fs_surf_home = get_flashscore_surface(home_name, surface)
+        if fs_surf_home: surface_home = fs_surf_home
+            
+    if not surface_away:
+        fs_surf_away = get_flashscore_surface(away_name, surface)
+        if fs_surf_away: surface_away = fs_surf_away
+
+    # 4. H2H (Sackmann -> Flashscore -> Пусто)
+    h2h = get_h2h(df, home_name, away_name)
+    if not h2h or h2h.get("total", 0) == 0:
+        fs_h2h = get_flashscore_h2h(home_name, away_name)
+        if fs_h2h: h2h = fs_h2h
+
+    if df.empty and (live_rest_home is None and live_rest_away is None) and not form_home and not form_away:
+        return None
 
     return {
         "home": {
             "form": form_home,
-            "h2h": get_h2h(df, home_name, away_name),
+            "h2h": h2h,
             "rest": rest_home,
             "surface": surface_home,
         },
         "away": {
             "form": form_away,
-            "h2h": get_h2h(df, away_name, home_name),
+            "h2h": get_h2h(df, away_name, home_name) if h2h is None else {"a_wins": h2h["b_wins"], "b_wins": h2h["a_wins"], "total": h2h["total"]},
             "rest": rest_away,
             "surface": surface_away,
         },
