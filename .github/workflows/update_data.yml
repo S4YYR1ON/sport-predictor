@@ -1,0 +1,37 @@
+name: Update Tennis Data
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Запуск каждый день в 3:00 UTC (6:00 МСК)
+  workflow_dispatch: # Кнопка для ручного запуска
+
+permissions:
+  contents: write # Даем роботу право делать коммиты
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Скачиваем репозиторий
+        uses: actions/checkout@v4
+
+      - name: Устанавливаем Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Устанавливаем зависимости
+        run: |
+          pip install apify-client pandas
+
+      - name: Запускаем скрипт
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: python fetch_flashscore.py
+
+      - name: Сохраняем изменения (Коммит и Пуш)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add flashscore_history.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update tennis data [skip ci]" && git push)
