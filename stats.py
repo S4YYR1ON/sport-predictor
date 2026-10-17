@@ -172,10 +172,12 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
     except Exception:
         return None
 
-    # Берем фамилию игрока для поиска (в нижнем регистре)
-    last_name = _last_name(player_name)
-    if not last_name:
+    # Разбиваем имя игрока для строгой проверки
+    our_parts = player_name.strip().split()
+    if not our_parts:
         return None
+    our_last = our_parts[-1].lower()
+    our_first_initial = our_parts[0][0].lower() if len(our_parts) > 1 else ""
 
     # Проверяем последние 14 дней ДО даты матча
     for i in range(1, 15):
@@ -212,8 +214,10 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
                             espn_last_name = str(athlete.get("lastName", "")).lower()
                             espn_display_name = str(athlete.get("displayName", "")).lower()
                             
-                            if last_name == espn_last_name or last_name in espn_display_name:
-                                return i # Нашли матч в одиночке, возвращаем дни
+                            # СТРОГАЯ ПРОВЕРКА: фамилия совпадает + первая буква имени (если есть)
+                            if our_last == espn_last_name:
+                                if not our_first_initial or our_first_initial in espn_display_name:
+                                    return i # Нашли матч, возвращаем дни отдыха
         except Exception:
             continue
 
