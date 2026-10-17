@@ -60,46 +60,98 @@ def get_surface(league_name):
             return surface
     return "hard"
 
-# Заменяем библиотеку pinnapi на прямой запрос requests (если у Pinnapi есть REST API)
 @st.cache_data(ttl=600)
 def get_pinnapi_tennis_events():
-    """
-    ВРЕМЕННАЯ ЗАГЛУШКА. 
-    Возвращает фейковые матчи, чтобы не ломать приложение, пока мы не узнаем 
-    точный URL API для Pinnacle.
-    """
     try:
         api_key = st.secrets["PINNAPI_API_KEY"]
-        if not api_key:
-            return [], "Ключ Pinnapi не настроен."
     except (KeyError, FileNotFoundError):
-        return [], "Ключ Pinnapi не настроен в секретах."
+        return None, "Ключ Pinnapi не настроен."
 
-    # Генерируем тестовые события, чтобы интерфейс работал
-    events = [
-        {
-            "home": "Novak Djokovic",
-            "away": "Carlos Alcaraz",
-            "start": "2024-05-20T14:00:00Z",
-            "source": "Тестовый источник (Заглушка)",
-            "odds_home": 1.85,
-            "odds_away": 1.95,
-            "match_id": "test1",
-            "league_name": "ATP Masters 1000",
-        },
-        {
-            "home": "Aryna Sabalenka",
-            "away": "Iga Swiatek",
-            "start": "2024-05-21T12:00:00Z",
-            "source": "Тестовый источник (Заглушка)",
-            "odds_home": 2.10,
-            "odds_away": 1.75,
-            "match_id": "test2",
-            "league_name": "WTA 1000",
-        }
-    ]
-    
-    return events, "Внимание: Pinnapi временно работает в режиме заглушки (тестовые матчи)."
+    # Правильный базовый URL и эндпоинт из документации
+    url = "https://pinnapi.com/kit/v1/prematch/fixtures"
+    headers = {"x-portal-apikey": api_key}
+    # sport_id=2 — это теннис (согласно документации)
+    params = {"sport_id": 2} 
+
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+        
+        # В ответе ожидаем список событий (fixtures). 
+        # Структура может быть в корне или внутри ключа 'events'/'fixtures'
+        events_list = data if isinstance(data, list) else data.get("events", data.get("fixtures", []))
+        
+        if not events_list:
+            return [], "Pinnapi не вернул событий."
+
+        now_utc = datetime.utcnow()
+        events = []
+        for ev in events_list:
+            # Пытаемся достать дату начала (может называться start, starts, start_time)
+            start_ts = ev.get("start") or ev.get("starts") or ev.get("start_time") or ""
+            
+            # Пропускаем прошедшие матчи
+            try:
+                clean = start_ts.split(".")[0].replace("Z", "")
+                dt = datetime.fromisoformat(clean)
+                if dt < now_utc:
+                    continue
+            except Exception:
+                pass
+
+            # Имена игроков
+            home = ev.get("home")
+            away = ev.get("away")
+            if not home or not away:
+                continue
+            
+            # Фильтр от парных матчей (там в именах бывает "/")
+            if "/" in home or "/" in away:
+                continue
+
+            # Ищем коэффициенты Moneyline. 
+            # В зависимости от структуры они могут быть в 'periods', 'markets' или сразу в корне.
+            odds_home = None
+            odds_away = None
+            
+            # Вариант 1: Коэфы лежат в periods (как в старом коде)
+            periods = ev.get("periods") or {}
+            main = periods.get("num_0") or {}
+            ml = main.get("money_line")
+            if isinstance(ml, dict):
+                odds_home = ml.get("home")
+                odds_away = ml.get("away")
+            
+            # Вариант 2: Коэфы лежат в markets (более вероятно для kit/v1)
+            if not odds_home:
+                markets = ev.get("markets") or []
+                for m in markets:
+                    if m.get("type") == "moneyline" or m.get("name") == "Moneyline":
+                        # В некоторых API это список исходов
+                        outcomes = m.get("outcomes") or []
+                        for o in outcomes:
+                            if o.get("type") == "home": odds_home = o.get("price")
+                            if o.get("type") == "away": odds_away = o.get("price")
+                        # В других — просто поля home/away
+                        if not odds_home:
+                            odds_home = m.get("home")
+                            odds_away = m.get("away")
+
+            events.append({
+                "home": home,
+                "away": away,
+                "start": start_ts,
+                "source": "Pinnapi · Pinnacle (Moneyline)" + (" · коэф. есть" if odds_home else " · коэф. нет"),
+                "odds_home": odds_home,
+                "odds_away": odds_away,
+                "match_id": ev.get("event_id") or ev.get("id"),
+                "league_name": ev.get("league_name", ev.get("league", "")),
+            })
+
+        return events, f"Pinnapi: найдено матчей {len(events)}."
+    except Exception as e:
+        return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
 
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
