@@ -82,7 +82,7 @@ with st.sidebar:
 
 # МАТЧИ И ПРОГНОЗЫ
 # ============================================================
-elif page == "Матчи и прогнозы":
+if page == "Матчи и прогнозы":
     sport_label = st.selectbox("Выбери спорт", list(SPORTS))
     sport = SPORTS[sport_label]
 
