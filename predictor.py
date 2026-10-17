@@ -127,8 +127,8 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             if elo_a_val and elo_b_val:
                 prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
                 prob_a = calibrate(prob_a)
-                prob_a, adj = adjust_with_stats(prob_a, stats)
-                prob_b = 1 - prob_a
+                tour_key = "wta" if "wta" in event.get("league_name", "").lower() else "atp"
+                prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
 
                 if prob_a >= prob_b:
                     selection = f"Победа {a}"
