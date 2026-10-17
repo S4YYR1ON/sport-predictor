@@ -11,7 +11,6 @@ from sources import (
     source_status,
     get_elo_ratings,
     get_surface,
-    get_all_betbetter_picks,
 )
 from stats import compute_match_stats
 
