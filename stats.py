@@ -168,7 +168,8 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
                         if last_name in name:
                             # Нашли матч! Считаем разницу в днях
                             return i
-        except Exception:
+        except Exception as e: 
+            st.warning(f"ESPN error {date_str}: {e}"); 
             continue
 
     # Если за 14 дней ничего не нашли — возвращаем None
