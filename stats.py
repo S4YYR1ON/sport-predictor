@@ -331,45 +331,35 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     # 1. Отдых (ESPN + Sackmann)
     live_rest_home = get_live_rest_days(home_name, match_date, tour)
     live_rest_away = get_live_rest_days(away_name, match_date, tour)
+    
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
     rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
 
-    # 2. Форма (Sackmann -> Flashscore -> Пусто)
+    # 2. Форма (только из Sackmann)
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
 
-
-    # 3. Покрытие (Sackmann -> Flashscore -> Пусто)
+    # 3. Покрытие (только из Sackmann)
     surface_home = get_surface_winrate(df, home_name, surface)
     surface_away = get_surface_winrate(df, away_name, surface)
-    
-    if not surface_home:
-        fs_surf_home = get_flashscore_surface(home_name, surface)
-        if fs_surf_home: surface_home = fs_surf_home
-            
-    if not surface_away:
-        fs_surf_away = get_flashscore_surface(away_name, surface)
-        if fs_surf_away: surface_away = fs_surf_away
 
-    # 4. H2H (Sackmann -> Flashscore -> Пусто)
-    h2h = get_h2h(df, home_name, away_name)
-    if not h2h or h2h.get("total", 0) == 0:
-        fs_h2h = get_flashscore_h2h(home_name, away_name)
-        if fs_h2h: h2h = fs_h2h
+    # 4. H2H (только из Sackmann)
+    h2h_home = get_h2h(df, home_name, away_name)
+    h2h_away = get_h2h(df, away_name, home_name)
 
-    if df.empty and (live_rest_home is None and live_rest_away is None) and not form_home and not form_away:
+    if df.empty and (live_rest_home is None and live_rest_away is None):
         return None
 
     return {
         "home": {
             "form": form_home,
-            "h2h": h2h,
+            "h2h": h2h_home,
             "rest": rest_home,
             "surface": surface_home,
         },
         "away": {
             "form": form_away,
-            "h2h": get_h2h(df, away_name, home_name) if h2h is None else {"a_wins": h2h["b_wins"], "b_wins": h2h["a_wins"], "total": h2h["total"]},
+            "h2h": h2h_away,
             "rest": rest_away,
             "surface": surface_away,
         },
