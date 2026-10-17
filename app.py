@@ -295,7 +295,7 @@ elif page == "Матчи и прогнозы":
                                     # Покрытие
                                     sh = match_stats["home"].get("surface")
                                     if sh and sh.get("win_rate") is not None:
-                                        st.write(f"Покрытие: **{sh['wins']}-{sh['matches'] - sh['wins']}** ({sh['win_rate']:.0%})")
+                                        st.write(f"Покрытие: **{sh['win_rate']:.0%}** ({sh['matches']} матчей)")
                                     else:
                                         st.caption("Покрытие: нет данных")
                                         
@@ -323,7 +323,7 @@ elif page == "Матчи и прогнозы":
                                     # Покрытие
                                     sa = match_stats["away"].get("surface")
                                     if sa and sa.get("win_rate") is not None:
-                                        st.write(f"Покрытие: **{sa['wins']}-{sa['matches'] - sa['wins']}** ({sa['win_rate']:.0%})")
+                                        st.write(f"Покрытие: **{sh['win_rate']:.0%}** ({sh['matches']} матчей)")
                                     else:
                                         st.caption("Покрытие: нет данных")
                                         
