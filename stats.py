@@ -223,80 +223,70 @@ def get_surface_winrate(df, player_name, surface):
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def get_sofascore_form(player_name):
-    if not player_name:
+def get_apisports_form(player_name):
+    """
+    Получает форму игрока через API-Sports (Бесплатный тариф: 100 запросов/день).
+    Отлично работает на Streamlit Cloud без блокировок.
+    """
+    try:
+        api_key = st.secrets["API_SPORTS_KEY"]
+    except (KeyError, FileNotFoundError):
         return None
         
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json"
-    }
-    
-    # Берем только фамилию для поиска (например, "Gentzsch" вместо "Tom Gentzsch")
-    last_name = player_name.strip().split()[-1]
+    headers = {"x-apisports-key": api_key}
+    base_url = "https://v1.tennis.api-sports.io"
     
     try:
-        # 1. Ищем игрока
-        search_url = f"https://api.sofascore.com/api/v1/search/all?q={requests.utils.quote(last_name)}"
-        r_search = requests.get(search_url, headers=headers, timeout=10)
-        
+        # 1. Ищем игрока по имени
+        search_url = f"{base_url}/players"
+        r_search = requests.get(search_url, headers=headers, params={"search": player_name}, timeout=10)
         if r_search.status_code != 200:
-            print(f"Sofascore search error: {r_search.status_code}") # Выведет в консоль
             return None
             
         search_data = r_search.json()
-        results = search_data.get("results", [])
-        
-        player_id = None
-        for item in results:
-            # Ищем тип 'player' и проверяем, что имя похоже на наше
-            if item.get("type") == "player":
-                found_name = item.get("entity", {}).get("name", "").lower()
-                if last_name.lower() in found_name:
-                    player_id = item.get("entity", {}).get("id")
-                    break
-                
+        players = search_data.get("response", [])
+        if not players:
+            return None
+            
+        player_id = players[0].get("id")
         if not player_id:
-            print(f"Sofascore: Player {player_name} not found")
             return None
             
-        # 2. Получаем последние матчи
-        matches_url = f"https://api.sofascore.com/api/v1/team/{player_id}/events/last/0"
-        r_matches = requests.get(matches_url, headers=headers, timeout=10)
+        # 2. Запрашиваем матчи текущего сезона
+        current_year = datetime.now().year
+        games_url = f"{base_url}/games"
+        r_games = requests.get(games_url, headers=headers, params={"player": player_id, "season": current_year}, timeout=10)
         
-        if r_matches.status_code != 200:
-            print(f"Sofascore matches error: {r_matches.status_code}")
+        if r_games.status_code != 200:
             return None
             
-        matches_data = r_matches.json()
-        events = matches_data.get("events", [])
+        games_data = r_games.json()
+        games = games_data.get("response", [])
         
         wins = 0
         total = 0
         
-        for ev in reversed(events):
-            if ev.get("status", {}).get("type") != "finished":
+        # Идем по матчам с конца (самые свежие)
+        for game in reversed(games):
+            if game.get("status", {}).get("short") != "FT": # FT = Finished
                 continue
                 
-            winner_code = ev.get("winnerCode")
-            if not winner_code:
-                continue
-                
-            is_home = ev.get("homeTeam", {}).get("id") == player_id
-            is_away = ev.get("awayTeam", {}).get("id") == player_id
+            # Определяем, был ли наш игрок домашним или гостевым
+            home_id = game.get("players", {}).get("home", {}).get("id")
+            away_id = game.get("players", {}).get("away", {}).get("id")
             
-            if is_home:
-                if winner_code == 1: wins += 1
-                total += 1
-            elif is_away:
-                if winner_code == 2: wins += 1
-                total += 1
+            winner = game.get("winner", "") # "Home" или "Away"
+            
+            if home_id == player_id and winner == "Home":
+                wins += 1
+            elif away_id == player_id and winner == "Away":
+                wins += 1
                 
+            total += 1
             if total >= 10:
                 break
                 
         if total == 0:
-            print(f"Sofascore: No finished matches for {player_name}")
             return None
             
         return {
@@ -308,7 +298,6 @@ def get_sofascore_form(player_name):
         }
         
     except Exception as e:
-        print(f"Sofascore exception: {e}")
         return None
 
 @st.cache_data(ttl=86400, show_spinner=False)
