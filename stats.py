@@ -4,7 +4,6 @@ import requests
 import streamlit as st
 from io import StringIO
 import datetime
-from livetennisapi import LiveTennisAPI
 
 SACKMANN_BASE = "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main"
 
