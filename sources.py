@@ -63,36 +63,43 @@ def get_surface(league_name):
 # Заменяем библиотеку pinnapi на прямой запрос requests (если у Pinnapi есть REST API)
 @st.cache_data(ttl=600)
 def get_pinnapi_tennis_events():
+    """
+    ВРЕМЕННАЯ ЗАГЛУШКА. 
+    Возвращает фейковые матчи, чтобы не ломать приложение, пока мы не узнаем 
+    точный URL API для Pinnacle.
+    """
     try:
         api_key = st.secrets["PINNAPI_API_KEY"]
+        if not api_key:
+            return [], "Ключ Pinnapi не настроен."
     except (KeyError, FileNotFoundError):
-        return None, "Ключ Pinnapi не настроен."
+        return [], "Ключ Pinnapi не настроен в секретах."
 
-    # ЗАМЕНИ URL НА РЕАЛЬНЫЙ ЭНДПОИНТ PINNAPI ДЛЯ ТЕННИСА
-    # Я использую примерный URL, так как не знаю точного API Pinnapi
-    url = "https://api.pinnapi.com/v1/events" 
-    headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"sport": "tennis"}
-
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        events_list = data.get("events", [])
-        
-        if not events_list:
-            return [], "Pinnapi не вернул событий."
-
-        now_utc = datetime.utcnow()
-        events = []
-        for ev in events_list:
-            start_ts = ev.get("start_time", "")
-            # ... Остальная логика парсинга событий ...
-            # (Тут нужно будет подогнать ключи под реальный ответ API Pinnapi)
-            
-        return events, f"Pinnapi: найдено матчей {len(events)}."
-    except Exception as e:
-        return None, f"Ошибка Pinnapi: {type(e).__name__} - {e}"
+    # Генерируем тестовые события, чтобы интерфейс работал
+    events = [
+        {
+            "home": "Novak Djokovic",
+            "away": "Carlos Alcaraz",
+            "start": "2024-05-20T14:00:00Z",
+            "source": "Тестовый источник (Заглушка)",
+            "odds_home": 1.85,
+            "odds_away": 1.95,
+            "match_id": "test1",
+            "league_name": "ATP Masters 1000",
+        },
+        {
+            "home": "Aryna Sabalenka",
+            "away": "Iga Swiatek",
+            "start": "2024-05-21T12:00:00Z",
+            "source": "Тестовый источник (Заглушка)",
+            "odds_home": 2.10,
+            "odds_away": 1.75,
+            "match_id": "test2",
+            "league_name": "WTA 1000",
+        }
+    ]
+    
+    return events, "Внимание: Pinnapi временно работает в режиме заглушки (тестовые матчи)."
 
 @st.cache_data(ttl=86400)
 def get_elo_ratings(tour="atp"):
