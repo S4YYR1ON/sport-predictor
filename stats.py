@@ -315,16 +315,16 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
     
-    # Если в Sackmann пусто или мало матчей, идем в Sofascore
+    # Если в Sackmann пусто или мало матчей, идем в API-Sports
     if not form_home or form_home.get("insufficient_data"):
-        sofascore_home = get_sofascore_form(home_name)
-        if sofascore_home:
-            form_home = sofascore_home
+        api_home = get_apisports_form(home_name)
+        if api_home:
+            form_home = api_home
             
     if not form_away or form_away.get("insufficient_data"):
-        sofascore_away = get_sofascore_form(away_name)
-        if sofascore_away:
-            form_away = sofascore_away
+        api_away = get_apisports_form(away_name)
+        if api_away:
+            form_away = api_away
 
     # 3. Покрытие (Оставим только Sackmann, так как Sofascore сложнее парсить по покрытиям)
     surface_home = get_surface_winrate(df, home_name, surface)
