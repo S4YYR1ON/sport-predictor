@@ -260,8 +260,8 @@ def get_livetennis_form(player_name, tour="atp"):
                 "insufficient_data": False
             }
     except Exception as e:
-        # Если API упал или лимит исчерпан — тихо возвращаем None
-        # print(f"LiveTennis Error: {e}") # для отладки
+        # ВРЕМЕННО ВЫВОДИМ ОШИБКУ В ИНТЕРФЕЙС
+        st.error(f"Ошибка LiveTennis: {type(e).__name__} - {e}")
         return None
 
 
