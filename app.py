@@ -294,6 +294,8 @@ elif page == "Матчи и прогнозы":
                                             st.caption("Отдых: данные устаревшие")
                                         else:
                                             st.write(f"Отдых: **{rh} дн.**")
+                                    else:
+                                        st.caption("Отдых: нет данных")
                                 with col_a:
                                     st.markdown(f"**{e['away']}**")
                                     fa = match_stats["away"].get("form") or {}
@@ -308,6 +310,8 @@ elif page == "Матчи и прогнозы":
                                             st.caption("Отдых: данные устаревшие")
                                         else:
                                             st.write(f"Отдых: **{ra} дн.**")
+                                    else:
+                                        st.caption("Отдых: нет данных")
                                 h2h = match_stats["home"].get("h2h") or {}
                                 if h2h.get("total", 0) > 0:
                                     st.write(f"**H2H:** {h2h['a_wins']} — {h2h['b_wins']}")
