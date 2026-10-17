@@ -121,6 +121,7 @@ def get_rest_days(df, player_name, before_date=None):
     return (before - past["tourney_date"].max()).days
 @st.cache_data(ttl=3600, show_spinner=False)
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_live_rest_days(player_name, match_date, tour="atp"):
     """
     Ищет реальные дни отдыха через ESPN.
@@ -138,8 +139,8 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
     except Exception:
         return None
 
-    # Берем фамилию игрока для поиска в ESPN
-    last_name = _last_name(player_name).capitalize()
+    # Берем фамилию игрока для поиска (в нижнем регистре)
+    last_name = _last_name(player_name)
     if not last_name:
         return None
 
@@ -148,7 +149,6 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
         
-        # ESPN API для тенниса
         url = f"https://site.api.espn.com/apis/site/v2/sports/tennis/{tour}/scoreboard?dates={date_str}"
         
         try:
@@ -160,19 +160,26 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
             events = data.get("events", [])
             
             for ev in events:
-                for comp in ev.get("competitions", []):
-                    for competitor in comp.get("competitors", []):
-                        athlete = competitor.get("athlete", {})
-                        name = athlete.get("displayName", "")
-                        # Ищем совпадение по фамилии
-                        if last_name in name:
-                            # Нашли матч! Считаем разницу в днях
-                            return i
-        except Exception as e: 
-            st.warning(f"ESPN error {date_str}: {e}"); 
+                # ИСПРАВЛЕНИЕ 1: Идем глубже в groupings
+                groupings = ev.get("groupings", [])
+                for group in groupings:
+                    competitions = group.get("competitions", [])
+                    for comp in competitions:
+                        for competitor in comp.get("competitors", []):
+                            athlete = competitor.get("athlete", {})
+                            
+                            # ИСПРАВЛЕНИЕ 2: Приводим к нижнему регистру для сравнения
+                            # Пытаемся взять lastName напрямую, если нет - берем displayName
+                            espn_last_name = str(athlete.get("lastName", "")).lower()
+                            espn_display_name = str(athlete.get("displayName", "")).lower()
+                            
+                            # Если фамилия совпала
+                            if last_name == espn_last_name or last_name in espn_display_name:
+                                return i # Нашли матч, возвращаем дни отдыха
+        except Exception:
             continue
 
-    # Если за 14 дней ничего не нашли — возвращаем None
+    # Если за 14 дней ничего не нашли
     return None
 
 def get_surface_winrate(df, player_name, surface):
