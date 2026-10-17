@@ -155,6 +155,18 @@ def get_rest_days(df, player_name, before_date=None):
 @st.cache_data(ttl=3600, show_spinner=False)
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_espn_day(date_str, tour):
+    """Скачивает табло ESPN за конкретный день и кэширует его на 24 часа."""
+    url = f"https://site.api.espn.com/apis/site/v2/sports/tennis/{tour}/scoreboard?dates={date_str}"
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return {}
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_live_rest_days(player_name, match_date, tour="atp"):
     """
@@ -172,7 +184,6 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
     except Exception:
         return None
 
-    # Готовим имя для поиска
     our_parts = player_name.strip().split()
     if not our_parts:
         return None
@@ -184,46 +195,40 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
         
-        url = f"https://site.api.espn.com/apis/site/v2/sports/tennis/{tour}/scoreboard?dates={date_str}"
-        
-        try:
-            r = requests.get(url, timeout=10)
-            if r.status_code != 200:
-                continue
-            
-            data = r.json()
-            events = data.get("events", [])
-            
-            for ev in events:
-                groupings = ev.get("groupings", [])
-                for group in groupings:
-                    competitions = group.get("competitions", [])
-                    
-                    for comp in competitions:
-                        comp_type = comp.get("type", {}).get("text", "").lower()
-                        if "doubles" in comp_type:
-                            continue
-                            
-                        for competitor in comp.get("competitors", []):
-                            athlete = competitor.get("athlete", {})
-                            
-                            # Собираем все возможные варианты имени от ESPN
-                            names_to_check = [
-                                str(athlete.get("displayName", "")).lower(),
-                                str(athlete.get("shortName", "")).lower(),
-                                str(athlete.get("fullName", "")).lower(),
-                                str(athlete.get("lastName", "")).lower()
-                            ]
-                            combined_name = " ".join(names_to_check)
-                            
-                            # Проверяем: есть ли наша фамилия и первая буква имени
-                            if our_last in combined_name:
-                                if not our_first_initial or our_first_initial in combined_name:
-                                    return i
-        except Exception:
+        # Используем кэшированную функцию (вместо прямого requests.get)
+        data = fetch_espn_day(date_str, tour)
+        if not data:
             continue
+            
+        events = data.get("events", [])
+        
+        for ev in events:
+            groupings = ev.get("groupings", [])
+            for group in groupings:
+                competitions = group.get("competitions", [])
+                
+                for comp in competitions:
+                    comp_type = comp.get("type", {}).get("text", "").lower()
+                    if "doubles" in comp_type:
+                        continue
+                        
+                    for competitor in comp.get("competitors", []):
+                        athlete = competitor.get("athlete", {})
+                        
+                        names_to_check = [
+                            str(athlete.get("displayName", "")).lower(),
+                            str(athlete.get("shortName", "")).lower(),
+                            str(athlete.get("fullName", "")).lower(),
+                            str(athlete.get("lastName", "")).lower()
+                        ]
+                        combined_name = " ".join(names_to_check)
+                        
+                        if our_last in combined_name:
+                            if not our_first_initial or our_first_initial in combined_name:
+                                return i
 
     return None
+
 
 def get_surface_winrate(df, player_name, surface):
     player_matches = _find_player_matches(df, player_name)
