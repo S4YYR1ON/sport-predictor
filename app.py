@@ -280,18 +280,26 @@ elif page == "Матчи и прогнозы":
                         if match_stats:
                             with st.expander("📈 Дополнительные факторы", expanded=False):
                                 col_h, col_a = st.columns(2)
+                                
+                                # === ДОМАШНИЙ ИГРОК ===
                                 with col_h:
                                     st.markdown(f"**{e['home']}**")
-                                    fh = match_stats["home"].get("form") or {}
-                                    if fh and fh.get("insufficient_data"):
-                                        st.caption("Форма (10): мало данных в архиве")
-                                    elif fh and fh.get("win_rate") is not None:
+                                    
+                                    # Форма
+                                    fh = match_stats["home"].get("form")
+                                    if fh and fh.get("win_rate") is not None and not fh.get("insufficient_data"):
                                         st.write(f"Форма (10): **{fh['wins']}-{fh['losses']}** ({fh['win_rate']:.0%})")
                                     else:
                                         st.caption("Форма: нет данных")
-                                    sh = match_stats["home"].get("surface") or {}
-                                    if sh:
+                                        
+                                    # Покрытие
+                                    sh = match_stats["home"].get("surface")
+                                    if sh and sh.get("win_rate") is not None:
                                         st.write(f"Покрытие: **{sh['wins']}-{sh['matches'] - sh['wins']}** ({sh['win_rate']:.0%})")
+                                    else:
+                                        st.caption("Покрытие: нет данных")
+                                        
+                                    # Отдых
                                     rh = match_stats["home"].get("rest")
                                     if rh is not None:
                                         if rh > 30:
@@ -300,14 +308,26 @@ elif page == "Матчи и прогнозы":
                                             st.write(f"Отдых: **{rh} дн.**")
                                     else:
                                         st.caption("Отдых: нет данных")
+                                        
+                                # === ГОСТЕВОЙ ИГРОК ===
                                 with col_a:
                                     st.markdown(f"**{e['away']}**")
-                                    fa = match_stats["away"].get("form") or {}
-                                    if fa:
+                                    
+                                    # Форма
+                                    fa = match_stats["away"].get("form")
+                                    if fa and fa.get("win_rate") is not None and not fa.get("insufficient_data"):
                                         st.write(f"Форма (10): **{fa['wins']}-{fa['losses']}** ({fa['win_rate']:.0%})")
-                                    sa = match_stats["away"].get("surface") or {}
-                                    if sa:
+                                    else:
+                                        st.caption("Форма: нет данных")
+                                        
+                                    # Покрытие
+                                    sa = match_stats["away"].get("surface")
+                                    if sa and sa.get("win_rate") is not None:
                                         st.write(f"Покрытие: **{sa['wins']}-{sa['matches'] - sa['wins']}** ({sa['win_rate']:.0%})")
+                                    else:
+                                        st.caption("Покрытие: нет данных")
+                                        
+                                    # Отдых
                                     ra = match_stats["away"].get("rest")
                                     if ra is not None:
                                         if ra > 30:
@@ -316,6 +336,8 @@ elif page == "Матчи и прогнозы":
                                             st.write(f"Отдых: **{ra} дн.**")
                                     else:
                                         st.caption("Отдых: нет данных")
+                                        
+                                # === H2H ===
                                 h2h = match_stats["home"].get("h2h") or {}
                                 if h2h.get("total", 0) > 0:
                                     st.write(f"**H2H:** {h2h['a_wins']} — {h2h['b_wins']}")
