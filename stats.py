@@ -222,51 +222,12 @@ def get_surface_winrate(df, player_name, surface):
     }
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
 def get_livetennis_form(player_name, tour="atp"):
     """
-    Идет в LiveTennis API, если в Sackmann нет данных по игроку.
-    Возвращает словарь в том же формате, что и get_player_form.
+    Временно отключено из-за ограничений бесплатного тарифа Live Tennis API.
+    Бесплатный тариф не отдает историю матчей (только live).
     """
-    try:
-        # ВАЖНО: Проверь в документации LiveTennis, какие туры они поддерживают 
-        # ('atp', 'wta', 'challenger', 'itf'). 
-        # Если 'atp', то для Челленджеров нужно передавать 'challenger'.
-        api_tour = "challenger" if tour == "atp" else "itf" 
-        
-        with LiveTennisAPI(
-            api_key=st.secrets["LIVETENNIS_API_KEY"],
-            auth_header="bearer"  # <-- явно указываем заголовок
-        ) as client:
-            # Ищем последние 10 матчей
-            matches = client.list_completed_matches(
-                tour=api_tour,
-                draw="singles",
-                player=player_name,
-                limit=10
-            )
-            
-            if not matches:
-                return None
-                
-            # Считаем победы
-            # Внимание: проверь в документации, как называется поле победителя (winner)
-            # Возможно, там нужно сравнивать ID игрока, а не имя.
-            wins = sum(1 for m in matches if player_name.lower() in str(m.winner).lower())
-            total = len(matches)
-            
-            return {
-                "matches": total,
-                "wins": wins,
-                "losses": total - wins,
-                "win_rate": wins / total if total > 0 else 0,
-                "insufficient_data": False
-            }
-    except Exception as e:
-        # ВРЕМЕННО ВЫВОДИМ ОШИБКУ В ИНТЕРФЕЙС
-        st.error(f"Ошибка LiveTennis: {type(e).__name__} - {e}")
-        return None
-
+    return None
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
@@ -279,26 +240,27 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
     rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
 
-    # 2. Форма (Sackmann + LiveTennis)
+    # 2. Форма (только из Sackmann)
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
-    
-    # Если в Sackmann пусто (None) или мало матчей (insufficient_data), идем в LiveTennis
-    if not form_home or form_home.get("insufficient_data"):
-        live_form_home = get_livetennis_form(home_name, tour)
-        if live_form_home:
-            form_home = live_form_home
-            
-    if not form_away or form_away.get("insufficient_data"):
-        live_form_away = get_livetennis_form(away_name, tour)
-        if live_form_away:
-            form_away = live_form_away
 
-    if df.empty and (live_rest_home is None and live_rest_away is None) and not form_home and not form_away:
+    if df.empty and (live_rest_home is None and live_rest_away is None):
         return None
 
     return {
         "home": {
+            "form": form_home,
+            "h2h": get_h2h(df, home_name, away_name),
+            "rest": rest_home,
+            "surface": get_surface_winrate(df, home_name, surface),
+        },
+        "away": {
+            "form": form_away,
+            "h2h": get_h2h(df, away_name, home_name),
+            "rest": rest_away,
+            "surface": get_surface_winrate(df, away_name, surface),
+        },
+    }
             "form": form_home,
             "h2h": get_h2h(df, home_name, away_name),
             "rest": rest_home,
