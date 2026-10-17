@@ -46,6 +46,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+SPORTS = {
+    "⚽ Футбол": "football",
+    "🎾 Теннис": "tennis",
+    "🛡 Dota 2": "dota2",
+    "🎯 CS2": "cs2",
+}
 
 def format_time(raw):
     if not raw:
