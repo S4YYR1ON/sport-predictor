@@ -1,5 +1,7 @@
 import pandas as pd
 import re
+import numpy as np 
+
 
 def find_elo_player(elo_dict, player_name):
     if not player_name or not elo_dict:
@@ -36,42 +38,72 @@ def calibrate(p):
     return p + 0.05 * (0.5 - p)
 
 
-def adjust_with_stats(prob_home, stats):
-    """Корректирует вероятность с учётом формы, H2H, отдыха, покрытия."""
+def adjust_with_stats(prob_home, stats, tour="atp"):
+    """
+    Корректирует вероятность с учётом ML-весов (Log-Odds).
+    """
     if not stats:
         return prob_home, 0.0
 
-    adj = 0.0
     home = stats.get("home", {})
     away = stats.get("away", {})
 
-    # 1. Форма (до ±3%)
-    fh = (home.get("form") or {}).get("win_rate")
-    fa = (away.get("form") or {}).get("win_rate")
-    if fh is not None and fa is not None:
-        adj += 0.03 * (fh - fa)
+    # 1. Считаем deltas (разницы), как в оптимизаторе
+    # Форма
+    fh = (home.get("form") or {}).get("win_rate", 0.5)
+    fa = (away.get("form") or {}).get("win_rate", 0.5)
+    form_diff = fh - fa
 
-    # 2. H2H (до ±2%)
+    # H2H
     h2h = home.get("h2h") or {}
+    h2h_diff = 0.0
     if h2h.get("total", 0) >= 3:
         h2h_diff = (h2h["a_wins"] - h2h["b_wins"]) / h2h["total"]
-        adj += 0.02 * h2h_diff
 
-    # 3. Отдых (до ±2%) — только если данные свежие
+    # Отдых
     rh = home.get("rest")
     ra = away.get("rest")
+    rest_diff = 0.0
     if rh is not None and ra is not None and rh < 30 and ra < 30:
-        diff = max(-7, min(7, rh - ra))
-        adj += 0.003 * diff
+        rest_diff = max(-7, min(7, rh - ra)) / 7.0
 
-    # 4. Винрейт по покрытию (до ±2%)
+    # Покрытие
     sh = (home.get("surface") or {}).get("win_rate")
     sa = (away.get("surface") or {}).get("win_rate")
+    surface_diff = 0.0
     if sh is not None and sa is not None:
-        adj += 0.02 * (sh - sa)
+        surface_diff = sh - sa
 
-    adj = max(-0.09, min(0.09, adj))
-    return max(0.05, min(0.95, prob_home + adj)), adj
+    # 2. Веса из оптимизатора (используем ATP по умолчанию, они близки)
+    # Если хочешь идеал, передавай tour в функцию и делай if tour == "wta": ...
+    if tour == "wta":
+        w_elo, w_form, w_h2h, w_rest, w_surf = 1.0375, -0.2884, 0.0396, -1.8298, 0.4227
+    else:
+        w_elo, w_form, w_h2h, w_rest, w_surf = 1.0725, -0.3906, 0.1796, -1.7684, 0.0594
+
+    # 3. Переводим вероятность Elo в Log-Odds
+    prob_home_safe = max(0.01, min(0.99, prob_home))
+    elo_log_odds = np.log(prob_home_safe / (1 - prob_home_safe))
+
+    # 4. Считаем новый Log-Odds
+    new_log_odds = (
+        (w_elo * elo_log_odds) + 
+        (w_form * form_diff) + 
+        (w_h2h * h2h_diff) + 
+        (w_rest * rest_diff) + 
+        (w_surf * surface_diff)
+    )
+
+    # 5. Переводим обратно в вероятность
+    new_prob = 1 / (1 + np.exp(-new_log_odds))
+    
+    # Ограничиваем, чтобы не было 0% или 100%
+    new_prob = max(0.05, min(0.95, new_prob))
+    
+    # Вычисляем чистую разницу (для вывода в UI)
+    adj = new_prob - prob_home
+
+    return new_prob, adj
 
 
 def predict(sport, event, elo_dict=None, surface="hard", stats=None):
