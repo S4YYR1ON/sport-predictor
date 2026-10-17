@@ -236,7 +236,7 @@ def get_livetennis_form(player_name, tour="atp"):
         
         with LiveTennisAPI(
             api_key=st.secrets["LIVETENNIS_API_KEY"],
-            auth_header="x-api-key"  # <-- явно указываем заголовок
+            auth_header="bearer"  # <-- явно указываем заголовок
         ) as client:
             # Ищем последние 10 матчей
             matches = client.list_completed_matches(
