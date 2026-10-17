@@ -41,9 +41,12 @@ def _find_player_matches(df, player_name):
     last = _last_name(player_name)
     if not last or df.empty:
         return df.iloc[0:0]
+    
+    # Используем регулярное выражение с \b для точного поиска фамилии
+    pattern = r'\b' + last + r'\b'
     mask = (
-        df["winner_name"].fillna("").str.lower().str.contains(last, regex=False)
-        | df["loser_name"].fillna("").str.lower().str.contains(last, regex=False)
+        df["winner_name"].fillna("").str.contains(pattern, regex=True, case=False)
+        | df["loser_name"].fillna("").str.contains(pattern, regex=True, case=False)
     )
     return df[mask]
 
@@ -97,16 +100,23 @@ def get_rest_days(df, player_name, before_date=None):
     player_matches = _find_player_matches(df, player_name)
     if player_matches.empty:
         return None
+        
     if before_date:
         try:
-            before = pd.Timestamp(before_date).tz_localize(None)
+            # Правильная обработка таймзон
+            before = pd.Timestamp(before_date)
+            if before.tz is not None:
+                before = before.tz_convert('UTC').tz_localize(None)
         except Exception:
-            before = pd.Timestamp.now()
+            return None  # Если дата битая, возвращаем None (а не текущее время)
     else:
-        before = pd.Timestamp.now()
+        return None  # Для прогноза дата матча обязательна
+        
     past = player_matches[player_matches["tourney_date"] < before]
     if past.empty:
         return None
+        
+    # ВАЖНО: tourney_date - это дата начала турнира, погрешность до 14 дней
     return (before - past["tourney_date"].max()).days
 
 
