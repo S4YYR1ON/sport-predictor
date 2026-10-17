@@ -52,26 +52,26 @@ def get_flashscore_form(player_name):
     if df.empty:
         return None
         
-    # Берем фамилию игрока (последнее слово) и переводим в нижний регистр
+    # Берем фамилию (последнее слово) в нижнем регистре
     last_name = player_name.strip().split()[-1].lower()
     
     player_matches = []
     for _, row in df.iterrows():
-        # Читаем колонки "home", "away" и "winner" из CSV
+        # В твоем CSV колонки называются 'home', 'away' и 'winner'
         home_str = str(row.get("home", "")).lower()
         away_str = str(row.get("away", "")).lower()
         winner_str = str(row.get("winner", "")).lower()
         
-        # Проверяем, есть ли наша фамилия в строке (словаре) с домашним или гостевым игроком
+        # Если фамилия есть в домашней команде и он победил
         if last_name in home_str:
             player_matches.append({"won": winner_str == "home"})
+        # Если фамилия есть в гостевой и он победил
         elif last_name in away_str:
             player_matches.append({"won": winner_str == "away"})
             
     if not player_matches:
         return None
         
-    # Берем последние 10 матчей
     last_10 = player_matches[-10:]
     wins = sum(1 for m in last_10 if m["won"])
     total = len(last_10)
@@ -83,7 +83,7 @@ def get_flashscore_form(player_name):
         "win_rate": wins / total,
         "insufficient_data": False
     }
-    
+
 
 def _last_name(name):
     if not name:
