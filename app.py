@@ -18,47 +18,63 @@ st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide"
 # --- СТИЛИЗАЦИЯ КНОПОК НАВИГАЦИИ (ПОЛНАЯ ШИРИНА) ---
 st.markdown("""
 <style>
-    /* 1. Заставляем контейнеры кнопок вылезти за отступы сайдбара */
-    section[data-testid="stSidebar"] div[data-testid="stButton"] {
-        margin-left: -1.5rem !important; /* Сдвигаем влево */
-        margin-right: -1.5rem !important; /* Сдвигаем вправо */
-        width: calc(100% + 3rem) !important; /* Растягиваем на всю ширину */
-        margin-bottom: 0 !important; /* Убираем отступы между кнопками */
+    /* 1. УБИРАЕМ ЧЕРНЫЕ ПОЛОСЫ МЕЖДУ КНОПКАМИ */
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+        gap: 0 !important; /* Убирает зазоры между блоками */
     }
 
-    /* 2. Настраиваем сами кнопки (убираем скругления и рамки) */
+    /* 2. РАСТЯГИВАЕМ НА ВСЮ ШИРИНУ */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] {
+        margin-left: -1.5rem !important; 
+        margin-right: -1.5rem !important; 
+        width: calc(100% + 3rem) !important; 
+        margin-bottom: 0 !important; 
+    }
+
+    /* 3. НАСТРАИВАЕМ КНОПКУ */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-        justify-content: flex-start !important; /* Текст влево */
-        padding: 15px 20px !important; /* Внутренние отступы для текста */
-        border-radius: 0 !important; /* Никаких скруглений */
-        border: none !important; /* Никаких рамок */
-        border-bottom: 1px solid #333 !important; /* Тонкая полоска-разделитель снизу */
+        justify-content: flex-start !important; 
+        padding: 16px 20px !important; /* Чуть больше отступы для высоты */
+        border-radius: 0 !important; 
+        border: none !important; 
+        border-bottom: 1px solid #333 !important; 
         box-shadow: none !important; 
         width: 100% !important;
-        font-weight: 600 !important;
-        font-size: 1.05rem !important;
+        min-height: 55px !important; /* Фиксируем высоту, чтобы текст стоял ровно */
+        display: flex !important;
+        align-items: center !important; /* Центрируем текст по вертикали */
         transition: all 0.2s ease !important;
     }
 
-    /* 3. Неактивные кнопки */
+    /* 4. ТЕКСТ ВНУТРИ (Убираем кривые отступы и УВЕЛИЧИВАЕМ) */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] > button p {
+        font-size: 1.35rem !important; /* Сделали шрифт еще больше */
+        font-weight: 600 !important;
+        margin: 0 !important; /* Убираем кривой отступ снизу */
+        padding: 0 !important;
+        line-height: 1 !important; /* Идеальная высота строки */
+        text-align: left !important;
+    }
+
+    /* 5. Неактивные кнопки */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"] {
         background-color: transparent !important;
         color: #FAFAFA !important;
     }
 
-    /* 4. Наведение на неактивную кнопку */
+    /* 6. Наведение */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
         background-color: #262730 !important;
         color: #1f77b4 !important;
-        border-left: 4px solid #1f77b4 !important; /* Красивая синяя полоска слева при наведении */
+        border-left: 4px solid #1f77b4 !important; 
     }
 
-    /* 5. Активная кнопка (синяя плашка на всю ширину) */
+    /* 7. Активная кнопка */
     section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
         background-color: #1f77b4 !important;
         color: #FFFFFF !important;
         border-bottom: 1px solid #1f77b4 !important;
-        border-left: 4px solid #1f77b4 !important; /* Акцентная полоска слева */
+        border-left: 4px solid #1f77b4 !important; 
     }
 </style>
 """, unsafe_allow_html=True)
