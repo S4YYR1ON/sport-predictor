@@ -179,14 +179,13 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
     except Exception:
         return None
 
-    our_parts = player_name.strip().split()
+    our_parts = player_name.strip().lower().replace(".", " ").split()
     if len(our_parts) < 2:
         return None
         
-    our_last = our_parts[-1].lower()
-    our_first = our_parts[0].lower() # Берем полное имя, а не первую букву
+    our_first = our_parts[0]
+    our_last = our_parts[-1]
 
-    # Проверяем последние 14 дней ДО даты матча
     for i in range(1, 15):
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
@@ -195,32 +194,33 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
         if not data:
             continue
             
-        events = data.get("events", [])
-        
-        for ev in events:
-            groupings = ev.get("groupings", [])
-            for group in groupings:
-                competitions = group.get("competitions", [])
-                
-                for comp in competitions:
-                    comp_type = comp.get("type", {}).get("text", "").lower()
-                    if "doubles" in comp_type:
+        for ev in data.get("events", []):
+            for group in ev.get("groupings", []):
+                for comp in group.get("competitions", []):
+                    if "doubles" in comp.get("type", {}).get("text", "").lower():
                         continue
                         
                     for competitor in comp.get("competitors", []):
                         athlete = competitor.get("athlete", {})
                         
-                        # Собираем все возможные варианты
-                        display_name = str(athlete.get("displayName", "")).lower()
-                        short_name = str(athlete.get("shortName", "")).lower()
+                        # Берем массив имен, которые отдает ESPN
+                        espn_names = [
+                            str(athlete.get("displayName", "")).lower(),
+                            str(athlete.get("shortName", "")).lower()
+                        ]
                         
-                        # Строгая проверка: фамилия должна быть в имени, 
-                        # И либо полное имя, либо первая буква имени должны совпадать
-                        if our_last in display_name or our_last in short_name:
-                            if our_first in display_name or our_first[0] in display_name or our_first in short_name:
-                                # ВРЕМЕННАЯ ОТЛАДКА: чтобы мы видели, кого он нашел
-                                st.toast(f"Найден отдых для {player_name}: {i} дн. (совпал с {display_name})")
-                                return i
+                        for name in espn_names:
+                            # Разбиваем имя ESPN на слова (например, "d." и "yastremska")
+                            name_parts = name.replace(".", " ").split()
+                            
+                            # Проверяем, что фамилия есть среди слов
+                            if our_last in name_parts:
+                                # Проверяем имя: либо полное совпадение, либо первая буква
+                                if our_first in name_parts:
+                                    return i
+                                elif len(name_parts) > 0 and len(name_parts[0]) == 1 and name_parts[0] == our_first[0]:
+                                    return i # Совпало, например, "k" и "k. day"
+
     return None
 
 
