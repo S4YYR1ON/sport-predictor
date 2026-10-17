@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 import streamlit as st
 from io import StringIO
+import datetime
 
 SACKMANN_BASE = "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main"
 
@@ -118,7 +119,60 @@ def get_rest_days(df, player_name, before_date=None):
         
     # ВАЖНО: tourney_date - это дата начала турнира, погрешность до 14 дней
     return (before - past["tourney_date"].max()).days
+@st.cache_data(ttl=3600, show_spinner=False)
 
+def get_live_rest_days(player_name, match_date, tour="atp"):
+    """
+    Ищет реальные дни отдыха через ESPN.
+    Возвращает int (дни) или None (если данных нет).
+    """
+    if not player_name or not match_date:
+        return None
+
+    try:
+        # Парсим дату матча (убираем таймзону)
+        md = pd.Timestamp(match_date)
+        if md.tz is not None:
+            md = md.tz_convert('UTC').tz_localize(None)
+        md_date = md.date()
+    except Exception:
+        return None
+
+    # Берем фамилию игрока для поиска в ESPN
+    last_name = _last_name(player_name).capitalize()
+    if not last_name:
+        return None
+
+    # Проверяем последние 14 дней ДО даты матча
+    for i in range(1, 15):
+        check_date = md_date - datetime.timedelta(days=i)
+        date_str = check_date.strftime("%Y%m%d")
+        
+        # ESPN API для тенниса
+        url = f"https://site.api.espn.com/apis/site/v2/sports/tennis/{tour}/scoreboard?dates={date_str}"
+        
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200:
+                continue
+            
+            data = r.json()
+            events = data.get("events", [])
+            
+            for ev in events:
+                for comp in ev.get("competitions", []):
+                    for competitor in comp.get("competitors", []):
+                        athlete = competitor.get("athlete", {})
+                        name = athlete.get("displayName", "")
+                        # Ищем совпадение по фамилии
+                        if last_name in name:
+                            # Нашли матч! Считаем разницу в днях
+                            return i
+        except Exception:
+            continue
+
+    # Если за 14 дней ничего не нашли — возвращаем None
+    return None
 
 def get_surface_winrate(df, player_name, surface):
     player_matches = _find_player_matches(df, player_name)
