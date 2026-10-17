@@ -203,24 +203,24 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
                     for competitor in comp.get("competitors", []):
                         athlete = competitor.get("athlete", {})
                         
-                        # Берем массив имен, которые отдает ESPN
                         espn_names = [
                             str(athlete.get("displayName", "")).lower(),
                             str(athlete.get("shortName", "")).lower()
                         ]
                         
                         for name in espn_names:
-                            # Разбиваем имя ESPN на слова (например, "d." и "yastremska")
                             name_parts = name.replace(".", " ").split()
                             
-                            # Проверяем, что фамилия есть среди слов
+                            # Если совпала фамилия, выводим отладку, даже если имя не совпало
                             if our_last in name_parts:
-                                # Проверяем имя: либо полное совпадение, либо первая буква
+                                st.error(f"📡 ESPN: Ищем '{player_name}', нашли '{name}' ({i} дн. назад)")
+                                
                                 if our_first in name_parts:
                                     return i
                                 elif len(name_parts) > 0 and len(name_parts[0]) == 1 and name_parts[0] == our_first[0]:
-                                    return i # Совпало, например, "k" и "k. day"
+                                    return i 
 
+    st.error(f"❌ ESPN: Для {player_name} ничего не найдено за 14 дней.")
     return None
 
 
