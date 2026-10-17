@@ -16,6 +16,27 @@ from sources import (
 from stats import compute_match_stats
 
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
+# --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
+st.markdown("""
+<style>
+    /* Убираем стандартные кружочки радио-кнопок */
+    div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+    /* Увеличиваем текст и делаем его жирным */
+    div[role="radiogroup"] > label {
+        font-size: 1.15rem !important;
+        font-weight: 600;
+        padding: 10px 0px;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    /* Добавляем красивый цвет при наведении */
+    div[role="radiogroup"] > label:hover {
+        color: #1f77b4 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 init_db()
 
 SPORTS = {
