@@ -18,10 +18,17 @@ st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide"
 # --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
 st.markdown("""
 <style>
-    /* 1. Жестко скрываем контейнер с кружочком (включая все вложенные элементы) */
+    /* 1. МАКСИМАЛЬНО ЖЕСТКО СКРЫВАЕМ КРУЖОЧКИ (все возможные варианты Streamlit) */
     div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
-    div[data-testid="stRadio"] div[role="radiogroup"] label [data-baseweb="radio"] > div:first-child {
+    div[data-testid="stRadio"] div[role="radiogroup"] label > input,
+    div[data-testid="stRadio"] div[data-baseweb="radio"] > div:first-child,
+    div[data-testid="stRadio"] div[data-baseweb="radio"] > input {
         display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     /* 2. Настраиваем саму кнопку меню */
@@ -32,10 +39,13 @@ st.markdown("""
         background-color: transparent !important;
         cursor: pointer !important;
         transition: all 0.2s ease !important;
+        
+        /* Выравниваем текст по центру кнопки */
         display: flex !important;
         align-items: center !important;
+        justify-content: flex-start !important;
         width: 100% !important;
-        box-sizing: border-box !important; /* Чтобы padding не вылезал за края */
+        box-sizing: border-box !important;
     }
     
     /* 3. Стилизуем текст (запрещаем перенос на новую строку) */
@@ -44,12 +54,11 @@ st.markdown("""
         font-weight: 600 !important;
         color: #FAFAFA !important;
         margin: 0 !important;
-        white-space: nowrap !important; /* Запрет переноса текста */
-        overflow: hidden !important;
-        text-overflow: ellipsis !important; /* Если не влезет — поставит ... */
+        white-space: nowrap !important; 
+        flex-grow: 1 !important; /* Текст занимает всё свободное место */
     }
     
-    /* 4. Эффект при наведении мыши */
+    /* 4. Эффект при наведении мыши (легкий серый фон) */
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
         background-color: #262730 !important;
     }
@@ -59,6 +68,7 @@ st.markdown("""
         background-color: #1f77b4 !important;
     }
     
+    /* 6. Белый жирный текст у выбранного пункта */
     div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {
         color: #FFFFFF !important;
         font-weight: 700 !important;
