@@ -222,12 +222,89 @@ def get_surface_winrate(df, player_name, surface):
     }
 
 
-def get_livetennis_form(player_name, tour="atp"):
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_sofascore_form(player_name):
     """
-    Временно отключено из-за ограничений бесплатного тарифа Live Tennis API.
-    Бесплатный тариф не отдает историю матчей (только live).
+    Бесплатный парсинг истории игрока через открытое API Sofascore.
+    Отлично подходит для ITF и Challenger.
     """
-    return None
+    if not player_name:
+        return None
+        
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    try:
+        # 1. Ищем игрока, чтобы получить его ID
+        search_url = f"https://api.sofascore.com/api/v1/search/all?q={requests.utils.quote(player_name)}"
+        r_search = requests.get(search_url, headers=headers, timeout=10)
+        if r_search.status_code != 200:
+            return None
+            
+        search_data = r_search.json()
+        results = search_data.get("results", [])
+        
+        player_id = None
+        for item in results:
+            if item.get("type") == "player":
+                # Берем первое совпадение (можно улучшить, сравнивая фамилии)
+                player_id = item.get("entity", {}).get("id")
+                break
+                
+        if not player_id:
+            return None
+            
+        # 2. Получаем последние матчи игрока (0 - значит все последние)
+        matches_url = f"https://api.sofascore.com/api/v1/team/{player_id}/events/last/0"
+        r_matches = requests.get(matches_url, headers=headers, timeout=10)
+        if r_matches.status_code != 200:
+            return None
+            
+        matches_data = r_matches.json()
+        events = matches_data.get("events", [])
+        
+        wins = 0
+        total = 0
+        
+        for ev in reversed(events): # Идем от старых к новым
+            if ev.get("status", {}).get("type") != "finished":
+                continue
+                
+            # В теннисе Sofascore использует homeScore/awayScore для сетов, 
+            # а winnerCode = 1 (домашний), 2 (гостевой)
+            winner_code = ev.get("winnerCode")
+            if not winner_code:
+                continue
+                
+            # Проверяем, был ли наш игрок домашним или гостевым
+            is_home = ev.get("homeTeam", {}).get("id") == player_id
+            is_away = ev.get("awayTeam", {}).get("id") == player_id
+            
+            if is_home:
+                if winner_code == 1: wins += 1
+                total += 1
+            elif is_away:
+                if winner_code == 2: wins += 1
+                total += 1
+                
+            if total >= 10:
+                break
+                
+        if total == 0:
+            return None
+            
+        return {
+            "matches": total,
+            "wins": wins,
+            "losses": total - wins,
+            "win_rate": wins / total,
+            "insufficient_data": False
+        }
+        
+    except Exception as e:
+        # Если API упал (например, заблокировал IP), тихо возвращаем None
+        return None
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
