@@ -211,7 +211,7 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             "fair_odds": 1 / p,
             "edge": p * odds - 1,
             "explanation": explanation,
-            "confidence": "низкая — нет независимой модели",
+            "confidence": "средняя — оценка по рынку Pinnacle (Elo отсутствует)",
             "adjustment": 0.0,
         }
 
