@@ -1,18 +1,32 @@
 import pandas as pd
-
+import re
 
 def find_elo_player(elo_dict, player_name):
     if not player_name or not elo_dict:
         return None
+    
+    # 1. Прямое совпадение (идеально)
     if player_name in elo_dict:
         return elo_dict[player_name]
+    
     parts = player_name.strip().split()
     if not parts:
         return None
+    
     last_name = parts[-1].lower()
+    # 2. Ищем по фамилии с проверкой границ слов (чтобы "Li" не находил "Cilic")
+    pattern = re.compile(r'\b' + re.escape(last_name) + r'\b', re.IGNORECASE)
+    
+    best_match = None
     for key, val in elo_dict.items():
-        if last_name in key.lower():
-            return val
+        if pattern.search(key):
+            # Если нашли несколько, берем того, чье имя длиннее (наиболее точное совпадение)
+            if best_match is None or len(key) < len(best_match[0]):
+                best_match = (key, val)
+                
+    if best_match:
+        return best_match[1]
+        
     return None
 
 
