@@ -20,31 +20,31 @@ st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide"
 st.markdown("""
 <style>
     /* Убираем стандартные кружочки радио-кнопок */
-    div[role="radiogroup"] > label > div:first-child {
+    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
         display: none !important;
     }
-    /* Увеличиваем текст и делаем его жирным */
-    div[role="radiogroup"] > label {
-        font-size: 1.15rem !important;
-        font-weight: 600;
-        padding: 10px 0px;
-        cursor: pointer;
-        transition: color 0.2s;
+    
+    /* Увеличиваем текст, делаем его жирным и меняем цвет */
+    div[data-testid="stRadio"] div[role="radiogroup"] label p {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        color: #FAFAFA !important; 
+        transition: color 0.2s ease-in-out;
     }
-    /* Добавляем красивый цвет при наведении */
-    div[role="radiogroup"] > label:hover {
+    
+    /* Красивое выделение синим цветом при наведении мыши */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:hover p {
         color: #1f77b4 !important;
+        cursor: pointer;
+    }
+    
+    /* Добавляем отступы между пунктами меню, чтобы они не слипались */
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
+        padding: 10px 0 !important;
+        border-bottom: 1px solid #262730; /* Тонкая линия-разделитель */
     }
 </style>
 """, unsafe_allow_html=True)
-init_db()
-
-SPORTS = {
-    "⚽ Футбол": "football",
-    "🎾 Теннис": "tennis",
-    "🛡 Dota 2": "dota2",
-    "🎯 CS2": "cs2",
-}
 
 
 def format_time(raw):
