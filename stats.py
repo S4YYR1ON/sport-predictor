@@ -229,6 +229,7 @@ def get_livetennis_form(player_name, tour="atp"):
     """
     return None
 
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
     df = load_matches(tour=tour)
@@ -249,18 +250,6 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
 
     return {
         "home": {
-            "form": form_home,
-            "h2h": get_h2h(df, home_name, away_name),
-            "rest": rest_home,
-            "surface": get_surface_winrate(df, home_name, surface),
-        },
-        "away": {
-            "form": form_away,
-            "h2h": get_h2h(df, away_name, home_name),
-            "rest": rest_away,
-            "surface": get_surface_winrate(df, away_name, surface),
-        },
-    }
             "form": form_home,
             "h2h": get_h2h(df, home_name, away_name),
             "rest": rest_home,
