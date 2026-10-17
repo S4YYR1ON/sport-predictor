@@ -158,6 +158,7 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
 
     # Проверяем последние 14 дней ДО даты матча
     for i in range(1, 15):
+        # 1. Сначала считаем дату и делаем запрос
         check_date = md_date - datetime.timedelta(days=i)
         date_str = check_date.strftime("%Y%m%d")
         
@@ -171,23 +172,27 @@ def get_live_rest_days(player_name, match_date, tour="atp"):
             data = r.json()
             events = data.get("events", [])
             
+            # 2. Проваливаемся в структуру JSON
             for ev in events:
-                # ИСПРАВЛЕНИЕ 1: Идем глубже в groupings
                 groupings = ev.get("groupings", [])
                 for group in groupings:
                     competitions = group.get("competitions", [])
+                    
                     for comp in competitions:
+                        # 3. ТУТ ФИЛЬТР ПАРНЫХ МАТЧЕЙ
+                        comp_type = comp.get("type", {}).get("text", "").lower()
+                        if "doubles" in comp_type:
+                            continue
+                            
+                        # 4. Ищем игрока
                         for competitor in comp.get("competitors", []):
                             athlete = competitor.get("athlete", {})
                             
-                            # ИСПРАВЛЕНИЕ 2: Приводим к нижнему регистру для сравнения
-                            # Пытаемся взять lastName напрямую, если нет - берем displayName
                             espn_last_name = str(athlete.get("lastName", "")).lower()
                             espn_display_name = str(athlete.get("displayName", "")).lower()
                             
-                            # Если фамилия совпала
                             if last_name == espn_last_name or last_name in espn_display_name:
-                                return i # Нашли матч, возвращаем дни отдыха
+                                return i # Нашли матч в одиночке, возвращаем дни
         except Exception:
             continue
 
