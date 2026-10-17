@@ -117,7 +117,6 @@ def get_flashscore_h2h(player_a, player_b):
 
 
 def get_flashscore_surface(player_name, target_surface):
-    """Считает винрейт на покрытии по базе Flashscore."""
     df = load_flashscore_history()
     if df.empty:
         return None
@@ -128,14 +127,16 @@ def get_flashscore_surface(player_name, target_surface):
     total = 0
     
     for _, row in df.iterrows():
+        # Иногда покрытие лежит в колонке 'competition', иногда в 'tournament'
         comp_str = str(row.get("competition", "")).lower()
+        tourn_str = str(row.get("tournament", "")).lower()
+        full_text = comp_str + " " + tourn_str
         
-        # Определяем покрытие из названия турнира
         match_surface = None
-        if "hard" in comp_str: match_surface = "hard"
-        elif "clay" in comp_str: match_surface = "clay"
-        elif "grass" in comp_str: match_surface = "grass"
-        elif "carpet" in comp_str: match_surface = "carpet"
+        if "hard" in full_text or "indoor" in full_text: match_surface = "hard"
+        elif "clay" in full_text: match_surface = "clay"
+        elif "grass" in full_text: match_surface = "grass"
+        elif "carpet" in full_text: match_surface = "carpet"
         
         if match_surface != target_surface:
             continue
