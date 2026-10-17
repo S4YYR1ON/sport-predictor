@@ -318,11 +318,26 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
     rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
 
-    # 2. Форма (только из Sackmann)
+    # 2. Форма (Sackmann -> Sofascore -> Пусто)
     form_home = get_player_form(df, home_name, n=10)
     form_away = get_player_form(df, away_name, n=10)
+    
+    # Если в Sackmann пусто или мало матчей, идем в Sofascore
+    if not form_home or form_home.get("insufficient_data"):
+        sofascore_home = get_sofascore_form(home_name)
+        if sofascore_home:
+            form_home = sofascore_home
+            
+    if not form_away or form_away.get("insufficient_data"):
+        sofascore_away = get_sofascore_form(away_name)
+        if sofascore_away:
+            form_away = sofascore_away
 
-    if df.empty and (live_rest_home is None and live_rest_away is None):
+    # 3. Покрытие (Оставим только Sackmann, так как Sofascore сложнее парсить по покрытиям)
+    surface_home = get_surface_winrate(df, home_name, surface)
+    surface_away = get_surface_winrate(df, away_name, surface)
+
+    if df.empty and (live_rest_home is None and live_rest_away is None) and not form_home and not form_away:
         return None
 
     return {
@@ -330,12 +345,12 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
             "form": form_home,
             "h2h": get_h2h(df, home_name, away_name),
             "rest": rest_home,
-            "surface": get_surface_winrate(df, home_name, surface),
+            "surface": surface_home,
         },
         "away": {
             "form": form_away,
             "h2h": get_h2h(df, away_name, home_name),
             "rest": rest_away,
-            "surface": get_surface_winrate(df, away_name, surface),
+            "surface": surface_away,
         },
     }
