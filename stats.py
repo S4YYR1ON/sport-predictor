@@ -234,7 +234,10 @@ def get_livetennis_form(player_name, tour="atp"):
         # Если 'atp', то для Челленджеров нужно передавать 'challenger'.
         api_tour = "challenger" if tour == "atp" else "itf" 
         
-        with LiveTennisAPI(api_key=st.secrets["LIVETENNIS_API_KEY"]) as client:
+        with LiveTennisAPI(
+            api_key=st.secrets["LIVETENNIS_API_KEY"],
+            auth_header="x-api-key"  # <-- явно указываем заголовок
+        ) as client:
             # Ищем последние 10 матчей
             matches = client.list_completed_matches(
                 tour=api_tour,
