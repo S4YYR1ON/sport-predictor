@@ -56,6 +56,17 @@ def get_player_form(df, player_name, n=10):
     player_matches = _find_player_matches(df, player_name)
     if player_matches.empty:
         return None
+    
+    # Если матчей в архиве основного тура меньше 5 — данных слишком мало для честного винрейта
+    if len(player_matches) < 5:
+        return {
+            "matches": len(player_matches),
+            "wins": 0, # Значения не важны, если ниже добавим проверку
+            "losses": 0,
+            "win_rate": None, # None означает "нет данных"
+            "insufficient_data": True
+        }
+
     last_n = player_matches.tail(n)
     last = _last_name(player_name)
     wins = int(
@@ -70,6 +81,7 @@ def get_player_form(df, player_name, n=10):
         "wins": wins,
         "losses": len(last_n) - wins,
         "win_rate": wins / len(last_n) if len(last_n) > 0 else 0,
+        "insufficient_data": False
     }
 
 
