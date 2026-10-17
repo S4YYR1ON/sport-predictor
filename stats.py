@@ -199,19 +199,29 @@ def get_surface_winrate(df, player_name, surface):
 @st.cache_data(ttl=86400, show_spinner=False)
 def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=None):
     df = load_matches(tour=tour)
-    if df.empty:
+    
+    # 1. Пытаемся получить "живой" отдых через ESPN
+    live_rest_home = get_live_rest_days(home_name, match_date, tour)
+    live_rest_away = get_live_rest_days(away_name, match_date, tour)
+    
+    # 2. Если ESPN не нашел (None), берем из архива Sackmann
+    rest_home = live_rest_home if live_rest_home is not None else get_rest_days(df, home_name, before_date=match_date)
+    rest_away = live_rest_away if live_rest_away is not None else get_rest_days(df, away_name, before_date=match_date)
+
+    if df.empty and (live_rest_home is None and live_rest_away is None):
         return None
+
     return {
         "home": {
             "form": get_player_form(df, home_name, n=10),
             "h2h": get_h2h(df, home_name, away_name),
-            "rest": get_rest_days(df, home_name, before_date=match_date),
+            "rest": rest_home,
             "surface": get_surface_winrate(df, home_name, surface),
         },
         "away": {
             "form": get_player_form(df, away_name, n=10),
             "h2h": get_h2h(df, away_name, home_name),
-            "rest": get_rest_days(df, away_name, before_date=match_date),
+            "rest": rest_away,
             "surface": get_surface_winrate(df, away_name, surface),
         },
     }
