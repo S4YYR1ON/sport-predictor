@@ -17,63 +17,6 @@ from stats import compute_match_stats
 st.set_page_config(page_title="Sport Predictor", page_icon="📊", layout="wide")
 # --- СТИЛИЗАЦИЯ НАВИГАЦИИ ---
 st.markdown("""
-<style>
-    /* 1. МАКСИМАЛЬНО ЖЕСТКО СКРЫВАЕМ КРУЖОЧКИ (все возможные варианты Streamlit) */
-    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
-    div[data-testid="stRadio"] div[role="radiogroup"] label > input,
-    div[data-testid="stRadio"] div[data-baseweb="radio"] > div:first-child,
-    div[data-testid="stRadio"] div[data-baseweb="radio"] > input {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    
-    /* 2. Настраиваем саму кнопку меню */
-    div[data-testid="stRadio"] div[role="radiogroup"] label {
-        padding: 12px 15px !important;
-        margin-bottom: 5px !important;
-        border-radius: 8px !important;
-        background-color: transparent !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        
-        /* Выравниваем текст по центру кнопки */
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    
-    /* 3. Стилизуем текст (запрещаем перенос на новую строку) */
-    div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-        color: #FAFAFA !important;
-        margin: 0 !important;
-        white-space: nowrap !important; 
-        flex-grow: 1 !important; /* Текст занимает всё свободное место */
-    }
-    
-    /* 4. Эффект при наведении мыши (легкий серый фон) */
-    div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-        background-color: #262730 !important;
-    }
-    
-    /* 5. Выделение выбранного пункта (синий фон) */
-    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
-        background-color: #1f77b4 !important;
-    }
-    
-    /* 6. Белый жирный текст у выбранного пункта */
-    div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-    }
-</style>
 """, unsafe_allow_html=True)
 
 SPORTS = {
@@ -103,16 +46,28 @@ st.caption(
 
 with st.sidebar:
     st.header("Навигация")
-    page = st.radio(
-        "Раздел",
-        [
-            "Матчи и прогнозы",
-            "Добавить матч вручную",
-            "История прогнозов",
-            "Виртуальный баланс",
-            "Источники данных",
-        ],
-    )
+    
+    # Инициализируем текущую страницу в памяти, если ее нет
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "Матчи и прогнозы"
+
+    # Функция для отрисовки красивой кнопки навигации
+    def nav_button(label):
+        # Если это текущая страница — делаем кнопку синей (primary), иначе обычной (secondary)
+        btn_type = "primary" if st.session_state.current_page == label else "secondary"
+        if st.button(label, use_container_width=True, type=btn_type):
+            st.session_state.current_page = label
+            st.rerun()
+
+    # Рисуем кнопки
+    nav_button("Матчи и прогнозы")
+    nav_button("Добавить матч вручную")
+    nav_button("История прогнозов")
+    nav_button("Виртуальный баланс")
+    nav_button("Источники данных")
+
+    # Записываем выбранную страницу в переменную
+    page = st.session_state.current_page
 
 # МАТЧИ И ПРОГНОЗЫ
 # ============================================================
