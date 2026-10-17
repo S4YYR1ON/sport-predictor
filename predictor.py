@@ -137,7 +137,6 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                 # Вот здесь мы применяем ML-веса
                 prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
                 
-                # ВОТ ОНА, ТА САМАЯ ПРОПАВШАЯ СТРОЧКА
                 prob_b = 1 - prob_a
 
                 if prob_a >= prob_b:
@@ -198,11 +197,11 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             odds = ob
             mfav = market_b
 
+        # ОБНОВЛЕННЫЙ ТЕКСТ ЗДЕСЬ
         explanation = (
             f"Оценка на основе коэффициентов Pinnacle (у игроков нет Elo-рейтинга для независимой модели). "
             f"Рыночная вероятность {a} — {market_a:.1%}, {b} — {market_b:.1%}. "
             f"Фаворит: {selection.split('Победа ')[1]} ({mfav:.1%} по рынку)."
-        )
         )
         return {
             "selection": selection,
