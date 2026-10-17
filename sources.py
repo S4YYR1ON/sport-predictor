@@ -106,8 +106,12 @@ def get_pinnapi_tennis_events():
             if not home or not away:
                 continue
             
-            # Фильтр от парных матчей (там в именах бывает "/")
+            # Фильтр от парных матчей
             if "/" in home or "/" in away:
+                continue
+                
+            # НОВЫЙ ФИЛЬТР: Пропускаем рынки на Тоталы (Games/Sets)
+            if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away:
                 continue
 
             # Ищем коэффициенты Moneyline. 
