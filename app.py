@@ -313,7 +313,18 @@ if page == "Матчи и прогнозы":
                                             st.write(f"Отдых: **{rh} дн.**")
                                     else:
                                         st.caption("Отдых: нет данных")
-                                        
+
+                                    # --- Подача/Прием/Усталость ---
+                                    adv_h = match_stats["home"].get("advanced")
+                                    if adv_h:
+                                        if adv_h.get("serve_rating") and not pd.isna(adv_h.get("serve_rating")):
+                                            st.write(f"Подача: **{adv_h['serve_rating']:.1%}** очков")
+                                        if adv_h.get("return_rating") and not pd.isna(adv_h.get("return_rating")):
+                                            st.write(f"Прием: **{adv_h['return_rating']:.1%}** очков")
+                                        if adv_h.get("fatigue_minutes") and not pd.isna(adv_h.get("fatigue_minutes")):
+                                            st.write(f"Время на корте: **{adv_h['fatigue_minutes']} мин.**")
+                                    else:
+                                        st.caption("Подача/Прием: нет данных")   
                                 # === ГОСТЕВОЙ ИГРОК ===
                                 with col_a:
                                     st.markdown(f"**{e['away']}**")
@@ -342,13 +353,25 @@ if page == "Матчи и прогнозы":
                                     else:
                                         st.caption("Отдых: нет данных")
                                         
+                                     # --- Подача/Прием/Усталость ---
+                                    adv_a = match_stats["away"].get("advanced")
+                                    if adv_a:
+                                        if adv_a.get("serve_rating") and not pd.isna(adv_a.get("serve_rating")):
+                                            st.write(f"Подача: **{adv_a['serve_rating']:.1%}** очков")
+                                        if adv_a.get("return_rating") and not pd.isna(adv_a.get("return_rating")):
+                                            st.write(f"Прием: **{adv_a['return_rating']:.1%}** очков")
+                                        if adv_a.get("fatigue_minutes") and not pd.isna(adv_a.get("fatigue_minutes")):
+                                            st.write(f"Время на корте: **{adv_a['fatigue_minutes']} мин.**")
+                                    else:
+                                        st.caption("Подача/Прием: нет данных")    
+                                        
                                 # === H2H ===
                                 h2h = match_stats["home"].get("h2h") or {}
                                 if h2h.get("total", 0) > 0:
                                     st.write(f"**H2H:** {h2h['a_wins']} — {h2h['b_wins']}")
                                 else:
                                     st.caption("H2H: личных встреч не найдено")
-
+                                    
                         # Value-калькулятор
                         prob_val = p["probability"]
                         fair_val = p["fair_odds"]
