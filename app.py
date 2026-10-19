@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from db import (
     init_db, save_prediction, list_predictions,
     settle_prediction, summary, update_closing_odds, clv_summary,
@@ -109,15 +109,30 @@ SPORTS = {
     "🎯 CS2": "cs2",
 }
 
+
 def format_time(raw):
     if not raw:
         return "неизвестно"
     try:
+        # 1. Если Pinnapi прислал время в формате Unix Timestamp (цифры)
+        if isinstance(raw, (int, float)) or (isinstance(raw, str) and raw.isdigit()):
+            dt_utc = datetime.fromtimestamp(int(raw), tz=timezone.utc)
+            dt_msk = dt_utc + timedelta(hours=3)
+            return dt_msk.strftime("%d.%m.%Y %H:%M") + " МСК"
+
+        # 2. Если это строка ISO (например, 2026-10-18T20:10:00Z)
         clean = raw.split(".")[0].replace("Z", "")
         dt_utc = datetime.fromisoformat(clean)
-        dt_msk = dt_utc + timedelta(hours=3)
+        
+        # Если время пришло с часовым поясом (tz-aware), конвертируем правильно
+        if dt_utc.tzinfo is not None:
+            dt_msk = dt_utc.astimezone(timezone(timedelta(hours=3)))
+        else:
+            # Если время наивное (UTC), просто прибавляем 3 часа
+            dt_msk = dt_utc + timedelta(hours=3)
+            
         return dt_msk.strftime("%d.%m.%Y %H:%M") + " МСК"
-    except Exception:
+    except Exception as e:
         return str(raw)
 
 
