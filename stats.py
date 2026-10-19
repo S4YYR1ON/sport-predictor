@@ -415,6 +415,10 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
     h2h_home = get_h2h(df, home_name, away_name)
     h2h_away = get_h2h(df, away_name, home_name)
 
+    # 5. Продвинутая статистика
+    adv_home = get_advanced_stats(df, home_name, match_date)
+    adv_away = get_advanced_stats(df, away_name, match_date)
+    
     # Если вообще ничего нет — возвращаем None
     if df.empty and (live_rest_home is None and live_rest_away is None):
         return None
@@ -425,11 +429,13 @@ def compute_match_stats(tour, home_name, away_name, surface="hard", match_date=N
             "h2h": h2h_home,
             "rest": rest_home,
             "surface": surface_home,
+            "advanced": adv_home,
         },
         "away": {
             "form": form_away,
             "h2h": h2h_away,
             "rest": rest_away,
             "surface": surface_away,
+            "advanced": adv_away,
         },
     }
