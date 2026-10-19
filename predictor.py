@@ -38,6 +38,8 @@ def calibrate(p):
     return p + 0.05 * (0.5 - p)
 
 
+import numpy as np # Обязательно добавь в самый верх файла predictor.py
+
 def adjust_with_stats(prob_home, stats, tour="atp"):
     """
     Корректирует вероятность с учётом ML-весов (Log-Odds).
@@ -48,7 +50,7 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     home = stats.get("home", {})
     away = stats.get("away", {})
 
-    # 1. Считаем deltas (разницы), как в оптимизаторе
+    # 1. Считаем deltas (разницы)
     # Форма
     fh = (home.get("form") or {}).get("win_rate", 0.5)
     fa = (away.get("form") or {}).get("win_rate", 0.5)
@@ -73,13 +75,28 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     surface_diff = 0.0
     if sh is not None and sa is not None:
         surface_diff = sh - sa
+        
+    # НОВЫЕ ФАКТОРЫ (Подача, Прием, Усталость)
+    adv_h = home.get("advanced") or {}
+    adv_a = away.get("advanced") or {}
+    
+    serve_h, serve_a = adv_h.get("serve_rating"), adv_a.get("serve_rating")
+    ret_h, ret_a = adv_h.get("return_rating"), adv_a.get("return_rating")
+    min_h, min_a = adv_h.get("fatigue_minutes"), adv_a.get("fatigue_minutes")
+    
+    serve_diff = (serve_h - serve_a) if (serve_h is not None and serve_a is not None) else 0.0
+    ret_diff = (ret_h - ret_a) if (ret_h is not None and ret_a is not None) else 0.0
+    fatigue_diff = ((min_a - min_h) / 120.0) if (min_h is not None and min_a is not None) else 0.0
 
-    # 2. Веса из оптимизатора (используем ATP по умолчанию, они близки)
-    # Если хочешь идеал, передавай tour в функцию и делай if tour == "wta": ...
+    # 2. Веса из оптимизатора (на основе твоих скриншотов)
     if tour == "wta":
-        w_elo, w_form, w_h2h, w_rest, w_surf = 1.0375, -0.2884, 0.0396, -1.8298, 0.4227
-    else:
-        w_elo, w_form, w_h2h, w_rest, w_surf = 1.0725, -0.3906, 0.1796, -1.7684, 0.0594
+        w_elo, w_form, w_h2h, w_rest, w_surf, w_serve, w_ret, w_fatigue = (
+            1.3845, -0.0736, -0.0054, -1.7219, 0.5488, 0.2576, -0.8903, -0.1899
+        )
+    else: # atp
+        w_elo, w_form, w_h2h, w_rest, w_surf, w_serve, w_ret, w_fatigue = (
+            1.0768, -0.0282, -0.0181, -1.8373, 0.8412, 0.5935, -0.6911, -0.3319
+        )
 
     # 3. Переводим вероятность Elo в Log-Odds
     prob_home_safe = max(0.01, min(0.99, prob_home))
@@ -91,7 +108,10 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
         (w_form * form_diff) + 
         (w_h2h * h2h_diff) + 
         (w_rest * rest_diff) + 
-        (w_surf * surface_diff)
+        (w_surf * surface_diff) +
+        (w_serve * serve_diff) +
+        (w_ret * ret_diff) +
+        (w_fatigue * fatigue_diff)
     )
 
     # 5. Переводим обратно в вероятность
