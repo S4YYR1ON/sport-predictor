@@ -40,91 +40,80 @@ def calibrate(p):
 
 import numpy as np # Обязательно добавь в самый верх файла predictor.py
 
+import numpy as np
+
 def adjust_with_stats(prob_home, stats, tour="atp"):
-    """
-    Корректирует вероятность с учётом ML-весов (Log-Odds).
-    """
     if not stats:
         return prob_home, 0.0
 
     home = stats.get("home", {})
     away = stats.get("away", {})
 
-    # 1. Считаем deltas (разницы)
-    # Форма
+    # 1. Форма (макс разница 0.3)
     fh = (home.get("form") or {}).get("win_rate", 0.5)
     fa = (away.get("form") or {}).get("win_rate", 0.5)
-    form_diff = fh - fa
+    form_diff = max(-0.3, min(0.3, fh - fa))
 
-    # H2H
+    # 2. H2H (макс разница 1.0)
     h2h = home.get("h2h") or {}
     h2h_diff = 0.0
     if h2h.get("total", 0) >= 3:
-        h2h_diff = (h2h["a_wins"] - h2h["b_wins"]) / h2h["total"]
+        h2h_diff = max(-1.0, min(1.0, (h2h["a_wins"] - h2h["b_wins"]) / h2h["total"]))
 
-    # Отдых
-    rh = home.get("rest")
-    ra = away.get("rest")
+    # 3. Отдых (макс разница 7 дней)
+    rh, ra = home.get("rest"), away.get("rest")
     rest_diff = 0.0
     if rh is not None and ra is not None and rh < 30 and ra < 30:
         rest_diff = max(-7, min(7, rh - ra)) / 7.0
 
-    # Покрытие
+    # 4. Покрытие (макс разница 0.4)
     sh = (home.get("surface") or {}).get("win_rate")
     sa = (away.get("surface") or {}).get("win_rate")
-    surface_diff = 0.0
-    if sh is not None and sa is not None:
-        surface_diff = sh - sa
+    surface_diff = max(-0.4, min(0.4, sh - sa)) if (sh is not None and sa is not None) else 0.0
         
-    # НОВЫЕ ФАКТОРЫ (Подача, Прием, Усталость)
-    adv_h = home.get("advanced") or {}
-    adv_a = away.get("advanced") or {}
+    # 5. Подача, Прием, Усталость (жестко ограничиваем)
+    adv_h, adv_a = home.get("advanced") or {}, away.get("advanced") or {}
     
     serve_h, serve_a = adv_h.get("serve_rating"), adv_a.get("serve_rating")
     ret_h, ret_a = adv_h.get("return_rating"), adv_a.get("return_rating")
     min_h, min_a = adv_h.get("fatigue_minutes"), adv_a.get("fatigue_minutes")
     
-    serve_diff = (serve_h - serve_a) if (serve_h is not None and serve_a is not None) else 0.0
-    ret_diff = (ret_h - ret_a) if (ret_h is not None and ret_a is not None) else 0.0
-    fatigue_diff = ((min_a - min_h) / 120.0) if (min_h is not None and min_a is not None) else 0.0
+    # Подача: разница не больше 10%
+    serve_diff = max(-0.1, min(0.1, serve_h - serve_a)) if (serve_h and serve_a) else 0.0
+    
+    # Прием: разница не больше 10%
+    ret_diff = max(-0.1, min(0.1, ret_h - ret_a)) if (ret_h and ret_a) else 0.0
+    
+    # Усталость: делим на 120, но ОГРАНИЧИВАЕМ до +/- 3 (чтобы не было выбросов)
+    fatigue_diff = 0.0
+    if min_h is not None and min_a is not None:
+        raw_diff = (min_a - min_h) / 120.0
+        fatigue_diff = max(-3.0, min(3.0, raw_diff))
 
-    # 2. Веса из оптимизатора (на основе твоих скриншотов)
+    # Веса из оптимизатора (Прием сделали положительным вручную, так как ML ошибся)
     if tour == "wta":
         w_elo, w_form, w_h2h, w_rest, w_surf, w_serve, w_ret, w_fatigue = (
-            1.3845, -0.0736, -0.0054, -1.7219, 0.5488, 0.2576, -0.8903, -0.1899
+            1.3845, -0.0736, -0.0054, -1.7219, 0.5488, 0.2576, 0.2000, -0.1899
         )
     else: # atp
         w_elo, w_form, w_h2h, w_rest, w_surf, w_serve, w_ret, w_fatigue = (
-            1.0768, -0.0282, -0.0181, -1.8373, 0.8412, 0.5935, -0.6911, -0.3319
+            1.0768, -0.0282, -0.0181, -1.8373, 0.8412, 0.5935, 0.3000, -0.3319
         )
 
-    # 3. Переводим вероятность Elo в Log-Odds
     prob_home_safe = max(0.01, min(0.99, prob_home))
     elo_log_odds = np.log(prob_home_safe / (1 - prob_home_safe))
 
-    # 4. Считаем новый Log-Odds
     new_log_odds = (
-        (w_elo * elo_log_odds) + 
-        (w_form * form_diff) + 
-        (w_h2h * h2h_diff) + 
-        (w_rest * rest_diff) + 
-        (w_surf * surface_diff) +
-        (w_serve * serve_diff) +
-        (w_ret * ret_diff) +
-        (w_fatigue * fatigue_diff)
+        (w_elo * elo_log_odds) + (w_form * form_diff) + (w_h2h * h2h_diff) + 
+        (w_rest * rest_diff) + (w_surf * surface_diff) + (w_serve * serve_diff) + 
+        (w_ret * ret_diff) + (w_fatigue * fatigue_diff)
     )
 
-    # 5. Переводим обратно в вероятность
     new_prob = 1 / (1 + np.exp(-new_log_odds))
-    
-    # Ограничиваем, чтобы не было 0% или 100%
     new_prob = max(0.05, min(0.95, new_prob))
-    
-    # Вычисляем чистую разницу (для вывода в UI)
     adj = new_prob - prob_home
 
     return new_prob, adj
-
 
 def predict(sport, event, elo_dict=None, surface="hard", stats=None):
     a = event.get("home", "Участник A")
