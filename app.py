@@ -430,6 +430,31 @@ elif page == "Добавить матч вручную":
             st.error("Введи названия обоих участников.")
         else:
             sport = SPORTS[sport_label]
+            # Передаем пустой словарь stats, чтобы избежать ошибок
+            e = {"home": a.strip(), "away": b.strip(),
+                 "odds_home": oa, "odds_away": ob, "manual": True}
+            p = predict(sport, e, stats={}) 
+            
+            pid = save_prediction(
+                sport, f"{a} — {b}", p["selection"], p["probability"],
+                p["odds"], p["explanation"], p["confidence"],
+            )
+            
+            if pid:
+                st.success(f"Сохранено как прогноз №{pid}")
+                x, y, z = st.columns(3)
+                x.metric("Исход модели", p["selection"])
+                y.metric("Вероятность", f"{p['probability']:.1%}")
+                z.metric("Справедливый коэффициент", f"{p['fair_odds']:.2f}")
+                st.warning(p["explanation"])
+            else:
+                st.error("Не удалось сохранить прогноз в базу данных. Проверь логи.")
+
+    if submitted:
+        if not a.strip() or not b.strip():
+            st.error("Введи названия обоих участников.")
+        else:
+            sport = SPORTS[sport_label]
             e = {"home": a.strip(), "away": b.strip(),
                  "odds_home": oa, "odds_away": ob, "manual": True}
             p = predict(sport, e)
