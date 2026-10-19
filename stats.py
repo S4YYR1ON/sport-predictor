@@ -104,6 +104,69 @@ def get_player_form(df, player_name, n=10):
         "insufficient_data": False
     }
 
+def get_advanced_stats(df, player_name, match_date=None):
+    """Считает подачу, прием и время на корте за последние 10 матчей."""
+    player_matches = _find_player_matches(df, player_name)
+    if player_matches.empty:
+        return None
+        
+    if match_date:
+        try:
+            before = pd.Timestamp(match_date).tz_localize(None)
+            player_matches = player_matches[player_matches["tourney_date"] < before]
+        except Exception:
+            pass
+            
+    last_n = player_matches.tail(10)
+    if last_n.empty:
+        return None
+
+    last = _last_name(player_name)
+    
+    total_svpt = 0
+    total_sv_won = 0
+    total_ret_pts = 0
+    total_ret_won = 0
+    total_minutes = 0
+    matches_counted = 0
+
+    for _, row in last_n.iterrows():
+        is_winner = last in str(row.get("winner_name", "")).lower()
+        
+        # Проверяем, есть ли вообще данные по подаче в этом матче
+        if pd.isna(row.get("w_svpt")) or pd.isna(row.get("l_svpt")):
+            continue
+            
+        if is_winner:
+            svpt = row["w_svpt"]
+            sv_won = row["w_1stWon"] + row["w_2ndWon"]
+            ret_pts = row["l_svpt"]
+            ret_won = row["l_svpt"] - (row["l_1stWon"] + row["l_2ndWon"])
+        else:
+            svpt = row["l_svpt"]
+            sv_won = row["l_1stWon"] + row["l_2ndWon"]
+            ret_pts = row["w_svpt"]
+            ret_won = row["w_svpt"] - (row["w_1stWon"] + row["w_2ndWon"])
+            
+        total_svpt += svpt
+        total_sv_won += sv_won
+        total_ret_pts += ret_pts
+        total_ret_won += ret_won
+        
+        if not pd.isna(row.get("minutes")):
+            total_minutes += row["minutes"]
+            
+        matches_counted += 1
+
+    if matches_counted == 0:
+        return None
+        
+    return {
+        "serve_rating": total_sv_won / total_svpt if total_svpt > 0 else None,
+        "return_rating": total_ret_won / total_ret_pts if total_ret_pts > 0 else None,
+        "fatigue_minutes": int(total_minutes) if total_minutes > 0 else None
+    }
+
 
 def get_h2h(df, player_a, player_b):
     last_a = _last_name(player_a)
