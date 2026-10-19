@@ -44,6 +44,8 @@ import numpy as np
 
 import numpy as np
 
+import numpy as np
+
 def adjust_with_stats(prob_home, stats, tour="atp"):
     if not stats:
         return prob_home, 0.0
@@ -51,7 +53,7 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     home = stats.get("home", {})
     away = stats.get("away", {})
 
-    # --- БАЗОВЫЕ 5 ФАКТОРОВ (ML-веса) ---
+    # --- 1. БАЗОВЫЕ 5 ФАКТОРОВ (С проверенными ML-весами) ---
     fh = (home.get("form") or {}).get("win_rate", 0.5)
     fa = (away.get("form") or {}).get("win_rate", 0.5)
     form_diff = fh - fa
@@ -72,6 +74,7 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     if sh is not None and sa is not None:
         surface_diff = sh - sa
 
+    # Выбираем веса в зависимости от тура
     if tour == "wta":
         w_elo, w_form, w_h2h, w_rest, w_surf = 1.0375, -0.2884, 0.0396, -1.8298, 0.4227
     else: # atp
@@ -80,7 +83,7 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     prob_home_safe = max(0.01, min(0.99, prob_home))
     elo_log_odds = np.log(prob_home_safe / (1 - prob_home_safe))
 
-    # Считаем базовый лог-шанс
+    # Считаем лог-шанс по 5 факторам
     new_log_odds = (
         (w_elo * elo_log_odds) + 
         (w_form * form_diff) + 
@@ -89,25 +92,24 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
         (w_surf * surface_diff)
     )
 
-    # --- НОВЫЕ ФАКТОРЫ (Ручной логичный вес) ---
+    # --- 2. НОВЫЕ ФАКТОРЫ (Ручные веса, которые дали прирост точности) ---
     adv_h, adv_a = home.get("advanced") or {}, away.get("advanced") or {}
     
-    # Подача: разница в 10% дает +0.1 к лог-шансам
+    # Подача (разница очков на подаче)
     serve_h, serve_a = adv_h.get("serve_rating"), adv_a.get("serve_rating")
     if serve_h is not None and serve_a is not None:
         new_log_odds += (serve_h - serve_a) * 1.0 
 
-    # Прием: разница в 10% дает +0.1 к лог-шансам
+    # Прием (разница очков на приеме)
     ret_h, ret_a = adv_h.get("return_rating"), adv_a.get("return_rating")
     if ret_h is not None and ret_a is not None:
         new_log_odds += (ret_h - ret_a) * 1.0
 
-    # Усталость: если игрок провел на 100 минут больше, это минус к шансам
+    # Усталость (разница в минутах на корте)
     min_h, min_a = adv_h.get("fatigue_minutes"), adv_a.get("fatigue_minutes")
     if min_h is not None and min_a is not None:
-        # Делим на 100, чтобы получить адекватный масштаб
-        fatigue_diff = (min_a - min_h) / 100.0 
-        new_log_odds += fatigue_diff * 0.2
+        # (min_a - min_h) / 100 * 0.2 = (min_a - min_h) / 500
+        new_log_odds += ((min_a - min_h) / 500.0)
 
     # Переводим обратно в вероятность
     new_prob = 1 / (1 + np.exp(-new_log_odds))
