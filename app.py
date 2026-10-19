@@ -250,9 +250,16 @@ if page == "Матчи и прогнозы":
                                     sport, e, elo_dict=elo_dict,
                                     surface=surface, stats=match_stats,
                                 )
+                                # Определяем реальный кэф из Pinnapi для сохранения
+                                actual_odds = None
+                                if p["selection"] == f"Победа {e['home']}":
+                                    actual_odds = e.get("odds_home")
+                                elif p["selection"] == f"Победа {e['away']}":
+                                    actual_odds = e.get("odds_away")
+                        
                                 pid = save_prediction(
                                     sport, f"{e['home']} — {e['away']}",
-                                    p["selection"], p["probability"], p["odds"],
+                                    p["selection"], p["probability"], actual_odds, 
                                     p["explanation"], p["confidence"],
                                 )
                                 st.session_state["last_result"] = {
@@ -432,12 +439,15 @@ elif page == "Добавить матч вручную":
             sport = SPORTS[sport_label]
             # Передаем пустой словарь stats, чтобы избежать ошибок
             e = {"home": a.strip(), "away": b.strip(),
-                 "odds_home": oa, "odds_away": ob, "manual": True}
+                 "odds_home": oa, "odds_away": ob, "manual": True}      
             p = predict(sport, e, stats={}) 
+            
+            # Определяем кэф для ручного матча
+            actual_odds = oa if p["selection"] == f"Победа {a.strip()}" else ob
             
             pid = save_prediction(
                 sport, f"{a} — {b}", p["selection"], p["probability"],
-                p["odds"], p["explanation"], p["confidence"],
+                actual_odds, p["explanation"], p["confidence"],
             )
             
             if pid:
