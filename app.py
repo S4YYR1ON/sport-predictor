@@ -413,6 +413,28 @@ if page == "Матчи и прогнозы":
                         prob_val = p["probability"]
                         fair_val = p["fair_odds"]
                         with st.expander("🔍 Проверить value с кэфом BetBoom", expanded=False):
+                         # ... код калькулятора ...
+                            pass # (здесь заканчивается старый код)
+
+                        # --- НОВЫЙ БЛОК: CLV-ТРЕКЕР В КАРТОЧКЕ МАТЧА ---
+                        with st.expander("📊 CLV-трекер (Закрывающая линия)", expanded=False):
+                            st.caption("Введи кэф Pinnacle прямо перед началом матча, чтобы посчитать CLV.")
+                            col_clv1, col_clv2 = st.columns([2, 1])
+                            with col_clv1:
+                                inline_clv_odd = st.number_input(
+                                    "Closing line Pinnacle",
+                                    min_value=1.01, max_value=100.0,
+                                    value=float(round(fair_val, 2)), step=0.01,
+                                    key=f"inline_clv_{r['id']}",
+                                )
+                            with col_clv2:
+                                st.write("") # Отступ для выравнивания кнопки
+                                st.write("")
+                                if st.button("Сохранить CLV", key=f"btn_clv_{r['id']}", use_container_width=True):
+                                    if update_closing_odds(int(r['id']), float(inline_clv_odd)):
+                                        st.success("CLV успешно сохранен!")
+                                        # Опционально: можно очистить кэш или перезагрузить, 
+                                        # но для простоты просто показываем успех.
                             bookie_odd = st.number_input(
                                 "Введи кэф BetBoom на этот исход",
                                 min_value=1.01, max_value=100.0,
