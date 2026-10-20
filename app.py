@@ -554,12 +554,12 @@ elif page == "История прогнозов":
             )
             if st.form_submit_button("Закрыть прогноз"):
                 with st.spinner("Обновляю статус в базе..."):
-                    success = settle_prediction(int(pid), result)
+                    success, message = settle_prediction(int(pid), result)
                 
                 if success:
-                    st.success("Прогноз закрыт. Обнови страницу.")
+                    st.success(message + " Обнови страницу.")
                 else:
-                    st.error("Не найден открытый прогноз с таким ID.")
+                    st.error(message)
 
 # ============================================================
 # БАЛАНС
