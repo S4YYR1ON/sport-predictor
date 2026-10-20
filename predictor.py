@@ -159,12 +159,10 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                 # SANITY CHECK
                 is_market_adjusted = False
                 
-                explanation_note = ""
                 if market_a is not None:
                     if abs(prob_a - market_a) > 0.25:
                         prob_a = (0.1 * prob_a) + (0.9 * market_a)
                         is_market_adjusted = True
-                        explanation_note = " (Внимание: Elo сильно расходится с рынком. Вероятность усреднена с Pinnacle)."
 
                 prob_b = 1 - prob_a
 
