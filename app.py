@@ -208,6 +208,18 @@ if page == "Матчи и прогнозы":
         if not events:
             st.warning("Нет подтверждённых матчей. Можно добавить вручную.")
         else:
+            # --- НОВЫЙ БЛОК: СОРТИРОВКА ПО ДАТЕ ---
+            def get_event_date(e):
+                try:
+                    # Парсим дату из строки формата ISO (убираем миллисекунды и Z)
+                    clean = e.get("start", "").split(".")[0].replace("Z", "")
+                    return datetime.fromisoformat(clean)
+                except Exception:
+                    # Если дата битая или пустая, отправляем матч в конец
+                    return datetime.max
+            
+            # Сортируем от ближайших к более поздним
+            events = sorted(events, key=get_event_date)
             for i, e in enumerate(events):
                 with st.container(border=True):
                     st.markdown(f"**{e['home']} — {e['away']}**")
