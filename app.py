@@ -230,7 +230,7 @@ if page == "Матчи и прогнозы":
 
                     col1, col2 = st.columns([1, 3])
                     with col1:
-                                                if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
+                        if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
                             with st.spinner("Анализирую (загружаю форму, H2H, Elo)…"):
                                 league = (e.get("league_name") or "").upper()
                                 tour_key = "wta" if "WTA" in league else "atp"
