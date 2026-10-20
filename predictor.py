@@ -157,10 +157,13 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                 prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
                 
                 # SANITY CHECK
+                is_market_adjusted = False
+                
                 explanation_note = ""
                 if market_a is not None:
                     if abs(prob_a - market_a) > 0.25:
-                        prob_a = (0.5 * prob_a) + (0.5 * market_a)
+                        prob_a = (0.1 * prob_a) + (0.9 * market_a)
+                        is_market_adjusted = True
                         explanation_note = " (Внимание: Elo сильно расходится с рынком. Вероятность усреднена с Pinnacle)."
 
                 prob_b = 1 - prob_a
@@ -196,6 +199,7 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                     "explanation": explanation,
                     "confidence": "средняя — Elo + ML-корректировки",
                     "adjustment": adj,
+                    "market_adjusted": is_market_adjusted,
                 }
 
     # ===== Fallback =====
