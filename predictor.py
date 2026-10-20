@@ -122,26 +122,30 @@ def adjust_with_stats(prob_home, stats, tour="atp"):
     adj = new_prob - prob_home
     return new_prob, adj
 
+
 def predict(sport, event, elo_dict=None, surface="hard", stats=None):
     a = event.get("home", "Участник A")
     b = event.get("away", "Участник B")
     
-    # Определяем тур для правильных ML-весов
-    league_name = (event.get("league_name") or "").lower()
-    tour_key = "wta" if "wta" in league_name else "atp"
+    tour_key = "wta" if "wta" in (event.get("league_name") or "").lower() else "atp"
+
+    # Сначала считаем рыночную вероятность (если кэфы есть)
+    market_a = None
+    oa = event.get("odds_home")
+    ob = event.get("odds_away")
+    if oa and ob and float(oa) > 1 and float(ob) > 1:
+        pa, pb = 1 / float(oa), 1 / float(ob)
+        market_a = pa / (pa + pb)
 
     # ===== Elo + калибровка + корректировка =====
     if elo_dict:
         elo_a = find_elo_player(elo_dict, a)
         elo_b = find_elo_player(elo_dict, b)
         if elo_a and elo_b:
-            surface_key = {"hard": "hElo", "clay": "cElo", "grass": "gElo"}.get(
-                surface, "elo"
-            )
+            surface_key = {"hard": "hElo", "clay": "cElo", "grass": "gElo"}.get(surface, "elo")
             elo_a_val = elo_a.get(surface_key) if isinstance(elo_a, dict) else elo_a
             elo_b_val = elo_b.get(surface_key) if isinstance(elo_b, dict) else elo_b
             
-            # Если данных по покрытию нет, берем общий Elo
             if not elo_a_val or not elo_b_val or pd.isna(elo_a_val) or pd.isna(elo_b_val):
                 elo_a_val = elo_a.get("elo") if isinstance(elo_a, dict) else elo_a
                 elo_b_val = elo_b.get("elo") if isinstance(elo_b, dict) else elo_b
@@ -149,10 +153,23 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             if elo_a_val and elo_b_val:
                 prob_a = 1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400))
                 prob_a = calibrate(prob_a)
-                
-                # Вот здесь мы применяем ML-веса
                 prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
                 
+                # --- НОВЫЙ БЛОК: SANITY CHECK (Проверка адекватности) ---
+                if market_a is not None:
+                    # Если модель расходится с рынком более чем на 25%, 
+                    # значит Elo сломан (или это возвращение после травмы).
+                    if abs(prob_a - market_a) > 0.25:
+                        # Мы не можем игнорировать рынок. Усредняем их (50/50)
+                        # Или можно отдать рынку больше веса: 0.3 * prob_a + 0.7 * market_a
+                        prob_a = (0.5 * prob_a) + (0.5 * market_a)
+                        adj = prob_a - (1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400)))
+                        explanation_note = " (Внимание: Elo сильно расходится с рынком. Вероятность усреднена с Pinnacle)."
+                    else:
+                        explanation_note = ""
+                else:
+                    explanation_note = ""
+
                 prob_b = 1 - prob_a
 
                 if prob_a >= prob_b:
@@ -164,60 +181,41 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                     probability = prob_b
                     fav, dog = b, a
 
-                surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(
-                    surface, "хард"
-                )
+                surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(surface, "хард")
                 explanation = (
-                    f"Прогноз на основе Elo-рейтингов Tennis Abstract ({surface_ru}) "
-                    f"с калибровкой и корректировкой по ML-весам. "
+                    f"Прогноз на основе Elo-рейтингов ({surface_ru}) "
+                    f"с калибровкой и ML-корректировкой. "
                     f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
-                    f"Вероятность победы {fav} — {probability:.1%}, "
-                    f"{dog} — {1 - probability:.1%}. "
-                    f"Корректировка: {adj:+.1%}."
+                    f"Вероятность победы {fav} — {probability:.1%}. "
+                    f"Корректировка: {adj:+.1%}.{explanation_note}"
                 )
-                confidence = f"средняя — Elo + ML-корректировки ({surface_ru})"
-
+                
                 return {
                     "selection": selection,
                     "probability": probability,
-                    "odds": None,
+                    "odds": float(oa) if selection == f"Победа {a}" else float(ob),
                     "fair_odds": 1 / probability,
-                    "edge": None,
+                    "edge": (probability * (float(oa) if selection == f"Победа {a}" else float(ob))) - 1 if oa and ob else None,
                     "explanation": explanation,
-                    "confidence": confidence,
+                    "confidence": "средняя — Elo + ML-корректировки",
                     "adjustment": adj,
                 }
 
-    # ===== Fallback (если нет Elo) =====
-    try:
-        oa = float(event.get("odds_home")) if event.get("odds_home") else None
-    except (TypeError, ValueError):
-        oa = None
-    try:
-        ob = float(event.get("odds_away")) if event.get("odds_away") else None
-    except (TypeError, ValueError):
-        ob = None
-
-    if oa and ob and oa > 1 and ob > 1:
-        pa, pb = 1 / oa, 1 / ob
-        market_a = pa / (pa + pb)
-        market_b = 1 - market_a
-        if market_a >= market_b:
+    # ===== Fallback =====
+    if market_a is not None:
+        # Тот самый блок, который работает, если Elo нет
+        if market_a >= 0.5:
             selection = f"Победа {a}"
             p = max(0.05, min(0.95, 0.85 * market_a + 0.15 * 0.5))
-            odds = oa
-            mfav = market_a
+            odds, mfav = float(oa), market_a
         else:
             selection = f"Победа {b}"
-            p = max(0.05, min(0.95, 0.85 * market_b + 0.15 * 0.5))
-            odds = ob
-            mfav = market_b
+            p = max(0.05, min(0.95, 0.85 * (1 - market_a) + 0.15 * 0.5))
+            odds, mfav = float(ob), (1 - market_a)
 
-        # ОБНОВЛЕННЫЙ ТЕКСТ ЗДЕСЬ
         explanation = (
-            f"Оценка на основе коэффициентов Pinnacle (у игроков нет Elo-рейтинга для независимой модели). "
-            f"Рыночная вероятность {a} — {market_a:.1%}, {b} — {market_b:.1%}. "
-            f"Фаворит: {selection.split('Победа ')[1]} ({mfav:.1%} по рынку)."
+            f"Оценка на основе коэффициентов Pinnacle (нет Elo-рейтинга). "
+            f"Рыночная вероятность {a} — {market_a:.1%}, {b} — {1-market_a:.1%}. "
         )
         return {
             "selection": selection,
@@ -226,12 +224,12 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
             "fair_odds": 1 / p,
             "edge": p * odds - 1,
             "explanation": explanation,
-            "confidence": "средняя — оценка по рынку Pinnacle (Elo отсутствует)",
+            "confidence": "средняя — оценка по рынку Pinnacle",
             "adjustment": 0.0,
         }
 
     return {
-        "selection": "Недостаточно данных для выбора",
+        "selection": "Недостаточно данных",
         "probability": 0.5,
         "odds": None,
         "fair_odds": 2.0,
