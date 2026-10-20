@@ -129,10 +129,11 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
     
     tour_key = "wta" if "wta" in (event.get("league_name") or "").lower() else "atp"
 
-    # Сначала считаем рыночную вероятность (если кэфы есть)
-    market_a = None
+    # Безопасно достаем кэфы
     oa = event.get("odds_home")
     ob = event.get("odds_away")
+    
+    market_a = None
     if oa and ob and float(oa) > 1 and float(ob) > 1:
         pa, pb = 1 / float(oa), 1 / float(ob)
         market_a = pa / (pa + pb)
@@ -155,30 +156,24 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                 prob_a = calibrate(prob_a)
                 prob_a, adj = adjust_with_stats(prob_a, stats, tour=tour_key)
                 
-                # --- НОВЫЙ БЛОК: SANITY CHECK (Проверка адекватности) ---
+                # SANITY CHECK
+                explanation_note = ""
                 if market_a is not None:
-                    # Если модель расходится с рынком более чем на 25%, 
-                    # значит Elo сломан (или это возвращение после травмы).
                     if abs(prob_a - market_a) > 0.25:
-                        # Мы не можем игнорировать рынок. Усредняем их (50/50)
-                        # Или можно отдать рынку больше веса: 0.3 * prob_a + 0.7 * market_a
                         prob_a = (0.5 * prob_a) + (0.5 * market_a)
-                        adj = prob_a - (1 / (1 + 10 ** ((elo_b_val - elo_a_val) / 400)))
                         explanation_note = " (Внимание: Elo сильно расходится с рынком. Вероятность усреднена с Pinnacle)."
-                    else:
-                        explanation_note = ""
-                else:
-                    explanation_note = ""
 
                 prob_b = 1 - prob_a
 
                 if prob_a >= prob_b:
                     selection = f"Победа {a}"
                     probability = prob_a
+                    odds_val = float(oa) if oa else None
                     fav, dog = a, b
                 else:
                     selection = f"Победа {b}"
                     probability = prob_b
+                    odds_val = float(ob) if ob else None
                     fav, dog = b, a
 
                 surface_ru = {"hard": "хард", "clay": "грунт", "grass": "трава"}.get(surface, "хард")
@@ -190,12 +185,14 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                     f"Корректировка: {adj:+.1%}.{explanation_note}"
                 )
                 
+                edge = (probability * odds_val - 1) if odds_val else None
+
                 return {
                     "selection": selection,
                     "probability": probability,
-                    "odds": float(oa) if selection == f"Победа {a}" else float(ob),
+                    "odds": odds_val,
                     "fair_odds": 1 / probability,
-                    "edge": (probability * (float(oa) if selection == f"Победа {a}" else float(ob))) - 1 if oa and ob else None,
+                    "edge": edge,
                     "explanation": explanation,
                     "confidence": "средняя — Elo + ML-корректировки",
                     "adjustment": adj,
@@ -203,15 +200,14 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
 
     # ===== Fallback =====
     if market_a is not None:
-        # Тот самый блок, который работает, если Elo нет
         if market_a >= 0.5:
             selection = f"Победа {a}"
             p = max(0.05, min(0.95, 0.85 * market_a + 0.15 * 0.5))
-            odds, mfav = float(oa), market_a
+            odds_val = float(oa)
         else:
             selection = f"Победа {b}"
             p = max(0.05, min(0.95, 0.85 * (1 - market_a) + 0.15 * 0.5))
-            odds, mfav = float(ob), (1 - market_a)
+            odds_val = float(ob)
 
         explanation = (
             f"Оценка на основе коэффициентов Pinnacle (нет Elo-рейтинга). "
@@ -220,9 +216,9 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
         return {
             "selection": selection,
             "probability": p,
-            "odds": odds,
+            "odds": odds_val,
             "fair_odds": 1 / p,
-            "edge": p * odds - 1,
+            "edge": p * odds_val - 1,
             "explanation": explanation,
             "confidence": "средняя — оценка по рынку Pinnacle",
             "adjustment": 0.0,
