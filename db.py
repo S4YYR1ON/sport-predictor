@@ -48,17 +48,25 @@ def settle_prediction(pid, result_status):
         .execute()
     )
     if not pred.data:
-        return False
+        return False, "Прогноз не найден или уже закрыт."
+        
     row = pred.data[0]
-    profit = (
-        (row["odds"] - 1)
-        if result_status == "won" and row["odds"]
-        else (-1 if result_status == "lost" else 0)
-    )
+    
+    # ЗАЩИТА: Если выиграл, но нет кэфа — не закрываем
+    if result_status == "won" and not row.get("odds"):
+        return False, "У прогноза нет сохранённого коэффициента. Невозможно посчитать прибыль."
+        
+    profit = 0.0
+    if result_status == "won" and row.get("odds"):
+        profit = row["odds"] - 1
+    elif result_status == "lost":
+        profit = -1.0
+        
     conn.table("predictions").update(
         {"status": result_status, "profit": profit}
     ).eq("id", pid).execute()
-    return True
+    
+    return True, "Успешно закрыт."
 
 
 def update_closing_odds(pid, closing_odds):
