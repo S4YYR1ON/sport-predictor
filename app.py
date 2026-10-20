@@ -540,25 +540,7 @@ elif page == "История прогнозов":
         st.dataframe(df[keep], use_container_width=True, hide_index=True)
 
         st.divider()
-        st.subheader("📊 CLV-трекер")
-        st.caption(
-            "CLV — разница между твоим кэфом и closing line Pinnacle. "
-            "Стабильно > 0 = преимущество есть."
-        )
-        with st.form("clv_form"):
-            clv_pid = st.number_input("ID прогноза", min_value=1, step=1, key="clv_pid")
-            clv_odd = st.number_input(
-                "Closing line Pinnacle",
-                min_value=1.01, value=1.50, step=0.01, key="clv_odd",
-            )
-            if st.form_submit_button("Сохранить closing odds и посчитать CLV"):
-                if update_closing_odds(int(clv_pid), float(clv_odd)):
-                    st.success("CLV сохранён.")
-                    st.rerun()
-                else:
-                    st.error("Не найден прогноз с таким ID.")
-
-        st.divider()
+        st.subheader("🏁 Закрыть прогноз")
         with st.form("settle"):
             pid = st.number_input("ID прогноза для закрытия", min_value=1, step=1)
             result = st.selectbox(
