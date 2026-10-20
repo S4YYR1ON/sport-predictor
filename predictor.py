@@ -183,7 +183,7 @@ def predict(sport, event, elo_dict=None, surface="hard", stats=None):
                     f"с калибровкой и ML-корректировкой. "
                     f"{a} ({elo_a_val:.0f}) vs {b} ({elo_b_val:.0f}). "
                     f"Вероятность победы {fav} — {probability:.1%}. "
-                    f"Корректировка: {adj:+.1%}.{explanation_note}"
+                    f"Корректировка: {adj:+.1%}."
                 )
                 
                 edge = (probability * odds_val - 1) if odds_val else None
