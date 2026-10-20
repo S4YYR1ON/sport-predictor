@@ -230,7 +230,7 @@ if page == "Матчи и прогнозы":
 
                     col1, col2 = st.columns([1, 3])
                     with col1:
-                        if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
+                                                if st.button("Анализировать", key=f"analyse_{sport}_{i}"):
                             with st.spinner("Анализирую (загружаю форму, H2H, Elo)…"):
                                 league = (e.get("league_name") or "").upper()
                                 tour_key = "wta" if "WTA" in league else "atp"
@@ -262,18 +262,20 @@ if page == "Матчи и прогнозы":
                                     sport, e, elo_dict=elo_dict,
                                     surface=surface, stats=match_stats,
                                 )
-                                # Определяем реальный кэф из Pinnapi для сохранения
-                                actual_odds = None
-                                if p["selection"] == f"Победа {e['home']}":
-                                    actual_odds = e.get("odds_home")
-                                elif p["selection"] == f"Победа {e['away']}":
-                                    actual_odds = e.get("odds_away")
-                        
-                                pid = save_prediction(
-                                    sport, f"{e['home']} — {e['away']}",
-                                    p["selection"], p["probability"], actual_odds, 
-                                    p["explanation"], p["confidence"],
-                                )
+                                
+                                with st.spinner("Сохраняю прогноз в базу..."):
+                                    actual_odds = None
+                                    if p["selection"] == f"Победа {e['home']}":
+                                        actual_odds = e.get("odds_home")
+                                    elif p["selection"] == f"Победа {e['away']}":
+                                        actual_odds = e.get("odds_away")
+
+                                    pid = save_prediction(
+                                        sport, f"{e['home']} — {e['away']}",
+                                        p["selection"], p["probability"], actual_odds, 
+                                        p["explanation"], p["confidence"],
+                                    )
+                                    
                                 st.session_state["last_result"] = {
                                     "event": e, "p": p, "id": pid,
                                     "sport": sport, "match_stats": match_stats,
@@ -431,8 +433,11 @@ if page == "Матчи и прогнозы":
                                 st.write("") # Отступ для выравнивания кнопки
                                 st.write("")
                                 if st.button("Сохранить CLV", key=f"btn_clv_{r['id']}", use_container_width=True):
-                                    if update_closing_odds(int(r['id']), float(inline_clv_odd)):
-                                        st.success("CLV успешно сохранен!")
+                                    with st.spinner("Сохраняю CLV..."):
+                                        success = update_closing_odds(int(r['id']), float(inline_clv_odd))
+                                    
+                                    if success:
+                                        st.success("CLV сохранен!")
                                         # Опционально: можно очистить кэш или перезагрузить, 
                                         # но для простоты просто показываем успех.
                             bookie_odd = st.number_input(
@@ -473,20 +478,19 @@ elif page == "Добавить матч вручную":
         if not a.strip() or not b.strip():
             st.error("Введи названия обоих участников.")
         else:
-            sport = SPORTS[sport_label]
-            # Передаем пустой словарь stats, чтобы избежать ошибок
-            e = {"home": a.strip(), "away": b.strip(),
-                 "odds_home": oa, "odds_away": ob, "manual": True}      
-            p = predict(sport, e, stats={}) 
-            
-            # Определяем кэф для ручного матча
-            actual_odds = oa if p["selection"] == f"Победа {a.strip()}" else ob
-            
-            pid = save_prediction(
-                sport, f"{a} — {b}", p["selection"], p["probability"],
-                actual_odds, p["explanation"], p["confidence"],
-            )
-            
+            with st.spinner("Считаю прогноз и сохраняю..."):
+                sport = SPORTS[sport_label]
+                e = {"home": a.strip(), "away": b.strip(),
+                     "odds_home": oa, "odds_away": ob, "manual": True}
+                p = predict(sport, e, stats={}) 
+                
+                actual_odds = oa if p["selection"] == f"Победа {a.strip()}" else ob
+                
+                pid = save_prediction(
+                    sport, f"{a} — {b}", p["selection"], p["probability"],
+                    actual_odds, p["explanation"], p["confidence"],
+                )
+                
             if pid:
                 st.success(f"Сохранено как прогноз №{pid}")
                 x, y, z = st.columns(3)
@@ -495,8 +499,7 @@ elif page == "Добавить матч вручную":
                 z.metric("Справедливый коэффициент", f"{p['fair_odds']:.2f}")
                 st.warning(p["explanation"])
             else:
-                st.error("Не удалось сохранить прогноз в базу данных. Проверь логи.")
-
+                st.error("Не удалось сохранить прогноз.")
     if submitted:
         if not a.strip() or not b.strip():
             st.error("Введи названия обоих участников.")
@@ -550,11 +553,13 @@ elif page == "История прогнозов":
                 }[x],
             )
             if st.form_submit_button("Закрыть прогноз"):
-                if settle_prediction(int(pid), result):
+                with st.spinner("Обновляю статус в базе..."):
+                    success = settle_prediction(int(pid), result)
+                
+                if success:
                     st.success("Прогноз закрыт. Обнови страницу.")
                 else:
                     st.error("Не найден открытый прогноз с таким ID.")
-
 
 # ============================================================
 # БАЛАНС
