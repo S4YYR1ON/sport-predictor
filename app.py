@@ -414,7 +414,6 @@ if page == "Матчи и прогнозы":
                         # Value-калькулятор
                         prob_val = p["probability"]
                         fair_val = p["fair_odds"]
-                        with st.expander("🔍 Проверить value с кэфом BetBoom", expanded=False):
                          # ... код калькулятора ...
                             pass # (здесь заканчивается старый код)
 
