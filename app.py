@@ -426,9 +426,10 @@ if page == "Матчи и прогнозы":
                         if not pinnacle_odd:
                             pinnacle_odd = fair_val
 
-                        with st.expander("🔍 Проверить value (BetBoom) и сохранить CLV", expanded=False):
+                        with st.expander("🔍 Проверить value и CLV", expanded=False):
+                            st.markdown("#### 1️⃣ Проверка Value (Модель vs BetBoom)")
                             
-                            # Единственное поле ввода
+                            # Поле ввода BetBoom
                             bb_odd = st.number_input(
                                 "Введи кэф BetBoom на этот исход", 
                                 min_value=1.01, max_value=100.0, 
@@ -452,28 +453,37 @@ if page == "Матчи и прогнозы":
                             
                             st.divider()
                             
-                            # Кнопка сохранения CLV (использует введенный кэф BetBoom и авто-кэф Pinnacle)
-                            st.caption(f"CLV будет рассчитан автоматически (Pinnacle: {pinnacle_odd:.2f})")
+                            st.markdown("#### 2️⃣ Сохранение CLV (Твой кэф vs Pinnacle)")
                             
-                            if st.button("Сохранить CLV", key=f"btn_clv_{r['id']}", use_container_width=True):
-                                with st.spinner("Считаю и сохраняю CLV..."):
-                                    # Сначала сохраняем кэф BetBoom в базу, как "твой кэф"
-                                    # (если ты ставил по нему)
-                                    conn = st.connection("supabase", type=SupabaseConnection) # или через db.py
-                                    # Но так как db.py ожидает closing_odds, передаем туда Pinnacle
-                                    
-                                    # ВАЖНО: В функции update_closing_odds мы считаем CLV = (Твой кэф / Closing кэф) - 1
-                                    # Поэтому нам надо передать туда Pinnacle, а BetBoom должен быть уже в базе.
-                                    # Если в базе сохранился Pinnacle, а не BetBoom, CLV будет 0.
-                                    # Чтобы не ломать логику, мы сохраним CLV как (BetBoom / Pinnacle)
-                                    
-                                    # Временное решение для UI: просто вызываем функцию
-                                    success = update_closing_odds(int(r['id']), float(pinnacle_odd))
-                                    
-                                if success:
-                                    st.success(f"CLV сохранен! (BetBoom {bb_odd:.2f} / Pinnacle {pinnacle_odd:.2f})")
+                            # Считаем CLV на лету (BetBoom / Pinnacle)
+                            if pinnacle_odd and bb_odd:
+                                expected_clv = (bb_odd / pinnacle_odd) - 1
+                                
+                                # Выводим крупную инфу
+                                st.info(f"📊 **Твой кэф (BetBoom):** {bb_odd:.2f}  |  **Закрывающая линия (Pinnacle):** {pinnacle_odd:.2f}")
+                                
+                                # Крупная плашка CLV
+                                col_clv1, col_clv2 = st.columns(2)
+                                col_clv1.metric("Ожидаемый CLV", f"{expected_clv:+.1%}")
+                                
+                                if expected_clv > 0:
+                                    col_clv2.success("✅ Ты обыграл закрытие!")
                                 else:
-                                    st.error("Ошибка сохранения.")
+                                    col_clv2.warning("⚠️ Ты взял хуже рынка.")
+                                    
+                                st.write("") # Отступ
+                                
+                                # Увеличенная кнопка
+                                if st.button("💾 Сохранить CLV в базу", key=f"btn_clv_{r['id']}", use_container_width=True, type="primary"):
+                                    with st.spinner("Сохраняю CLV..."):
+                                        success = update_closing_odds(int(r['id']), float(pinnacle_odd))
+                                    
+                                    if success:
+                                        st.success("✅ CLV успешно сохранен в историю!")
+                                    else:
+                                        st.error("Ошибка сохранения.")
+                            else:
+                                st.warning("Нет данных о кэфе Pinnacle для расчета CLV.")
 
 # ============================================================
 # ДОБАВИТЬ ВРУЧНУЮ
