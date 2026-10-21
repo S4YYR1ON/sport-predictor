@@ -413,29 +413,29 @@ if page == "Матчи и прогнозы":
                                     
                         # Value-калькулятор
                         fair_val = p["fair_odds"]
-
-                        # --- НОВЫЙ БЛОК: CLV-ТРЕКЕР В КАРТОЧКЕ МАТЧА ---
-                        with st.expander("📊 CLV-трекер (Закрывающая линия)", expanded=False):
-                            st.caption("Введи кэф Pinnacle прямо перед началом матча, чтобы посчитать CLV.")
-                            col_clv1, col_clv2 = st.columns([2, 1])
-                            with col_clv1:
-                                inline_clv_odd = st.number_input(
-                                    "Closing line Pinnacle",
-                                    min_value=1.01, max_value=100.0,
-                                    value=float(round(fair_val, 2)), step=0.01,
-                                    key=f"inline_clv_{r['id']}",
-                                )
-                            with col_clv2:
-                                st.write("") # Отступ для выравнивания кнопки
-                                st.write("")
-                                if st.button("Сохранить CLV", key=f"btn_clv_{r['id']}", use_container_width=True):
-                                    with st.spinner("Сохраняю CLV..."):
-                                        success = update_closing_odds(int(r['id']), float(inline_clv_odd))
-                                    
-                                    if success:
-                                        st.success("CLV сохранен!")
-                                        # Опционально: можно очистить кэш или перезагрузить, 
-                                        # но для простоты просто показываем успех.
+                        
+                        with st.expander("🔍 Проверить value с кэфом BetBoom", expanded=False):
+                            # Единственное поле ввода
+                            bb_odd = st.number_input(
+                                "Введи кэф BetBoom на этот исход", 
+                                min_value=1.01, max_value=100.0, 
+                                value=float(round(fair_val, 2)), step=0.01,
+                                key=f"bb_odd_{r['id']}",
+                            )
+                            
+                            # Мгновенный расчет и вывод
+                            val = p["probability"] * bb_odd - 1
+                            
+                            c1, c2 = st.columns(2)
+                            c1.metric("Кэф BetBoom", f"{bb_odd:.2f}")
+                            c2.metric("Value", f"{val:+.1%}")
+                            
+                            if val > 0.02:
+                                st.success(f"✅ **VALUE есть!** Модель дает {p['probability']:.1%}, а кэф окупает риск.")
+                            elif val > -0.02:
+                                st.warning(f"⚠️ **На грани:** {val:+.1%}. Ставить рискованно.")
+                            else:
+                                st.error(f"❌ **Value нет:** {val:+.1%}. Нужен кэф не ниже **{fair_val:.2f}**.")
 
 # ============================================================
 # ДОБАВИТЬ ВРУЧНУЮ
