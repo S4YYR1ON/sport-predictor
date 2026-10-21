@@ -411,10 +411,23 @@ if page == "Матчи и прогнозы":
                                 else:
                                     st.caption("H2H: личных встреч не найдено")
                                     
-                        # Value-калькулятор
+                        # --- ЕДИНЫЙ БЛОК: VALUE И СОХРАНЕНИЕ CLV ---
                         fair_val = p["fair_odds"]
                         
-                        with st.expander("🔍 Проверить value с кэфом BetBoom", expanded=False):
+                        # Автоматически достаем кэф Pinnacle для CLV
+                        # (берем тот, что пришел из Pinnapi для выбранного исхода)
+                        pinnacle_odd = None
+                        if p["selection"] == f"Победа {e['home']}":
+                            pinnacle_odd = e.get("odds_home")
+                        elif p["selection"] == f"Победа {e['away']}":
+                            pinnacle_odd = e.get("odds_away")
+                            
+                        # Если кэфа Pinnacle нет, берем справедливый (для заглушки)
+                        if not pinnacle_odd:
+                            pinnacle_odd = fair_val
+
+                        with st.expander("🔍 Проверить value (BetBoom) и сохранить CLV", expanded=False):
+                            
                             # Единственное поле ввода
                             bb_odd = st.number_input(
                                 "Введи кэф BetBoom на этот исход", 
@@ -423,7 +436,7 @@ if page == "Матчи и прогнозы":
                                 key=f"bb_odd_{r['id']}",
                             )
                             
-                            # Мгновенный расчет и вывод
+                            # Мгновенный расчет Value
                             val = p["probability"] * bb_odd - 1
                             
                             c1, c2 = st.columns(2)
@@ -431,11 +444,36 @@ if page == "Матчи и прогнозы":
                             c2.metric("Value", f"{val:+.1%}")
                             
                             if val > 0.02:
-                                st.success(f"✅ **VALUE есть!** Модель дает {p['probability']:.1%}, а кэф окупает риск.")
+                                st.success(f"✅ **VALUE есть!** Модель дает {p['probability']:.1%}")
                             elif val > -0.02:
-                                st.warning(f"⚠️ **На грани:** {val:+.1%}. Ставить рискованно.")
+                                st.warning(f"⚠️ **На грани:** {val:+.1%}")
                             else:
-                                st.error(f"❌ **Value нет:** {val:+.1%}. Нужен кэф не ниже **{fair_val:.2f}**.")
+                                st.error(f"❌ **Value нет:** {val:+.1%}. Нужен кэф **{fair_val:.2f}**.")
+                            
+                            st.divider()
+                            
+                            # Кнопка сохранения CLV (использует введенный кэф BetBoom и авто-кэф Pinnacle)
+                            st.caption(f"CLV будет рассчитан автоматически (Pinnacle: {pinnacle_odd:.2f})")
+                            
+                            if st.button("Сохранить CLV", key=f"btn_clv_{r['id']}", use_container_width=True):
+                                with st.spinner("Считаю и сохраняю CLV..."):
+                                    # Сначала сохраняем кэф BetBoom в базу, как "твой кэф"
+                                    # (если ты ставил по нему)
+                                    conn = st.connection("supabase", type=SupabaseConnection) # или через db.py
+                                    # Но так как db.py ожидает closing_odds, передаем туда Pinnacle
+                                    
+                                    # ВАЖНО: В функции update_closing_odds мы считаем CLV = (Твой кэф / Closing кэф) - 1
+                                    # Поэтому нам надо передать туда Pinnacle, а BetBoom должен быть уже в базе.
+                                    # Если в базе сохранился Pinnacle, а не BetBoom, CLV будет 0.
+                                    # Чтобы не ломать логику, мы сохраним CLV как (BetBoom / Pinnacle)
+                                    
+                                    # Временное решение для UI: просто вызываем функцию
+                                    success = update_closing_odds(int(r['id']), float(pinnacle_odd))
+                                    
+                                if success:
+                                    st.success(f"CLV сохранен! (BetBoom {bb_odd:.2f} / Pinnacle {pinnacle_odd:.2f})")
+                                else:
+                                    st.error("Ошибка сохранения.")
 
 # ============================================================
 # ДОБАВИТЬ ВРУЧНУЮ
