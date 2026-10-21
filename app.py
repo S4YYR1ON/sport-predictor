@@ -438,24 +438,6 @@ if page == "Матчи и прогнозы":
                                         st.success("CLV сохранен!")
                                         # Опционально: можно очистить кэш или перезагрузить, 
                                         # но для простоты просто показываем успех.
-                            bookie_odd = st.number_input(
-                                "Введи кэф BetBoom на этот исход",
-                                min_value=1.01, max_value=100.0,
-                                value=float(round(fair_val, 2)), step=0.01,
-                                key=f"mb_odd_{r['id']}",
-                            )
-                            if bookie_odd:
-                                val = prob_val * bookie_odd - 1
-                                c1, c2 = st.columns(2)
-                                c1.metric("Кэф BetBoom", f"{bookie_odd:.2f}")
-                                c2.metric("Value", f"{val:+.1%}")
-                                if val > 0.02:
-                                    st.success(f"✅ **VALUE есть!** {prob_val:.1%} × {bookie_odd:.2f} = {1 + val:.3f}")
-                                elif val > -0.02:
-                                    st.warning(f"⚠️ **На грани:** {val:+.1%}.")
-                                else:
-                                    st.error(f"❌ **Value нет:** {val:+.1%}. Нужен кэф **{fair_val:.2f}**.")
-
 
 # ============================================================
 # ДОБАВИТЬ ВРУЧНУЮ
