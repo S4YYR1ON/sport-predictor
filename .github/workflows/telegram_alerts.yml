@@ -3,6 +3,9 @@ name: Telegram Tennis Alerts
 on:
   workflow_dispatch: # Запуск по API от cron-job.org
 
+permissions:
+  contents: write # ДАЕМ ПРАВО НА СОХРАНЕНИЕ ФАЙЛА sent_matches.json
+
 jobs:
   send-alerts:
     runs-on: ubuntu-latest
@@ -30,4 +33,4 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add sent_matches.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches [skip ci]" && git push)
