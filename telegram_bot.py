@@ -8,7 +8,9 @@ import time
 
 # --- НАСТРОЙКИ TELEGRAM И PINNACLE ---
 TG_TOKEN = os.getenv("TG_TOKEN")
-TG_CHAT_ID = os.getenv("TG_CHAT_ID")
+# Читаем переменную и разбиваем её по запятой на список
+TG_CHAT_IDS_STR = os.getenv("TG_CHAT_ID", "")
+TG_CHAT_IDS = [cid.strip() for cid in TG_CHAT_IDS_STR.split(",") if cid.strip()]
 PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
 SENT_FILE = "sent_matches.json"
 
@@ -28,12 +30,22 @@ def save_sent(sent_set):
         json.dump(list(sent_set), f)
 
 def send_telegram_message(text):
-    if not TG_TOKEN or not TG_CHAT_ID: return
+    if not TG_TOKEN or not TG_CHAT_IDS: 
+        return
+        
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}, timeout=10)
-    except Exception as e:
-        print(f"Ошибка ТГ: {e}")
+    
+    # Отправляем сообщение каждому ID из списка
+    for chat_id in TG_CHAT_IDS:
+        payload = {
+            "chat_id": chat_id, 
+            "text": text, 
+            "parse_mode": "HTML"
+        }
+        try:
+            requests.post(url, json=payload, timeout=10)
+        except Exception as e:
+            print(f"Ошибка отправки для {chat_id}: {e}")
 
 def check_upcoming_matches():
     if not PINNAPI_KEY: return
