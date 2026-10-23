@@ -4,3 +4,4 @@ requests>=2.31,<3
 psycopg2-binary>=2.9.6
 st-supabase-connection>=1.0.0
 Flask>=3.0.0
+gunicorn>=21.2.0
