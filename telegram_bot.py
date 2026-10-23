@@ -65,7 +65,8 @@ def check_upcoming_matches():
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{ev.get('home')}_{ev.get('away')}"
 
-        if 0 < time_left <= 30 and match_id not in sent_set:
+        # ЖЕСТКОЕ ОКНО: Ищем матчи, до которых осталось от 14 до 16 минут
+        if 14 <= time_left <= 16 and match_id not in sent_set:
             home, away = ev.get("home"), ev.get("away")
             odds_home, odds_away = "?", "?"
             periods = ev.get("periods") or {}
@@ -90,8 +91,5 @@ def check_upcoming_matches():
     print(f"Проверка завершена. Отправлено: {matches_found}")
 
 if __name__ == "__main__":
-    # Бесконечный цикл проверки каждые 5 минут
-    import time
-    while True:
-        check_upcoming_matches()
-        time.sleep(300) # 5 минут
+    # Просто вызываем функцию ОДИН раз. Без циклов и задержек!
+    check_upcoming_matches()
