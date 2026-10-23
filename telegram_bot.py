@@ -2,19 +2,12 @@ import os
 import json
 import requests
 from datetime import datetime, timezone
-from flask import Flask
-import threading
-import time
 
-# --- НАСТРОЙКИ TELEGRAM И PINNACLE ---
 TG_TOKEN = os.getenv("TG_TOKEN")
-# Читаем переменную и разбиваем её по запятой на список
 TG_CHAT_IDS_STR = os.getenv("TG_CHAT_ID", "")
 TG_CHAT_IDS = [cid.strip() for cid in TG_CHAT_IDS_STR.split(",") if cid.strip()]
 PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
 SENT_FILE = "sent_matches.json"
-
-app = Flask(__name__)
 
 def load_sent():
     if os.path.exists(SENT_FILE):
@@ -32,23 +25,17 @@ def save_sent(sent_set):
 def send_telegram_message(text):
     if not TG_TOKEN or not TG_CHAT_IDS: 
         return
-        
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    
-    # Отправляем сообщение каждому ID из списка
     for chat_id in TG_CHAT_IDS:
-        payload = {
-            "chat_id": chat_id, 
-            "text": text, 
-            "parse_mode": "HTML"
-        }
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
         try:
             requests.post(url, json=payload, timeout=10)
         except Exception as e:
-            print(f"Ошибка отправки для {chat_id}: {e}")
+            print(f"Ошибка ТГ для {chat_id}: {e}")
 
 def check_upcoming_matches():
-    if not PINNAPI_KEY: return
+    if not PINNAPI_KEY: 
+        return
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     headers = {"x-portal-apikey": PINNAPI_KEY}
     
@@ -66,17 +53,18 @@ def check_upcoming_matches():
     
     for ev in events_list:
         start_ts = ev.get("start") or ev.get("starts")
-        if not start_ts: continue
+        if not start_ts: 
+            continue
         
         try:
             clean = start_ts.split(".")[0].replace("Z", "")
             match_time = datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
-        except: continue
+        except: 
+            continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{ev.get('home')}_{ev.get('away')}"
 
-        # Если матч начнется в ближайшие 30 минут
         if 0 < time_left <= 30 and match_id not in sent_set:
             home, away = ev.get("home"), ev.get("away")
             odds_home, odds_away = "?", "?"
@@ -101,23 +89,9 @@ def check_upcoming_matches():
     save_sent(sent_set)
     print(f"Проверка завершена. Отправлено: {matches_found}")
 
-# --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
-@app.route('/')
-def home():
-    # Эта функция нужна только для того, чтобы Render дал нам ссылку
-    # и чтобы UptimeRobot мог её пинговать
-    return "Bot is running!"
-
-def background_worker():
-    # Этот цикл работает в фоне и проверяет матчи каждые 5 минут
+if __name__ == "__main__":
+    # Бесконечный цикл проверки каждые 5 минут
+    import time
     while True:
         check_upcoming_matches()
-        time.sleep(300) # 300 секунд = 5 минут
-
-if __name__ == "__main__":
-    # Запускаем фоновую проверку в отдельном потоке
-    threading.Thread(target=background_worker, daemon=True).start()
-    
-    # Запускаем веб-сервер (Render сам подставит нужный порт)
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+        time.sleep(300) # 5 минут
