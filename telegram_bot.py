@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timezone
 
 TG_TOKEN = os.getenv("TG_TOKEN")
+# Сюда можно вписать несколько ID через запятую: "123456,789012"
 TG_CHAT_IDS_STR = os.getenv("TG_CHAT_ID", "")
 TG_CHAT_IDS = [cid.strip() for cid in TG_CHAT_IDS_STR.split(",") if cid.strip()]
 PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
@@ -49,9 +50,21 @@ def check_upcoming_matches():
 
     now_utc = datetime.now(timezone.utc)
     sent_set = load_sent()
-    matches_found = 0
     
     for ev in events_list:
+        home = ev.get("home")
+        away = ev.get("away")
+        if not home or not away: 
+            continue
+            
+        # ФИЛЬТР 1: Отсекаем рынки на Тоталы (Games/Sets)
+        if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away:
+            continue
+            
+        # ФИЛЬТР 2: Отсекаем парные матчи
+        if "/" in home or "/" in away:
+            continue
+
         start_ts = ev.get("start") or ev.get("starts")
         if not start_ts: 
             continue
@@ -63,11 +76,11 @@ def check_upcoming_matches():
             continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
-        match_id = ev.get("event_id") or ev.get("id") or f"{ev.get('home')}_{ev.get('away')}"
+        match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        # ЖЕСТКОЕ ОКНО: Ищем матчи, до которых осталось от 14 до 16 минут
-        if 14 <= time_left <= 16 and match_id not in sent_set:
-            home, away = ev.get("home"), ev.get("away")
+        # ФИЛЬТР 3: Жестко за 5 минут (окно от 1 до 5, чтобы не пропустить из-за задержек GitHub)
+        if 0 < time_left <= 5 and match_id not in sent_set:
+            
             odds_home, odds_away = "?", "?"
             periods = ev.get("periods") or {}
             main = periods.get("num_0") or {}
@@ -76,20 +89,24 @@ def check_upcoming_matches():
                 odds_home = ml.get("home", "?")
                 odds_away = ml.get("away", "?")
             
+            # Округляем кэфы для красоты
+            try:
+                o_h = f"{float(odds_home):.2f}"
+                o_a = f"{float(odds_away):.2f}"
+            except:
+                o_h, o_a = odds_home, odds_away
+                
             msg = (
-                f"🎾 <b>Скоро матч!</b>\n"
-                f"⏰ Начало через {int(time_left)} мин.\n"
+                f"🚨 <b>Матч через 5 минут!</b> 🚨\n"
                 f"🏆 <b>{home}</b> — <b>{away}</b>\n"
-                f"📊 Pinnacle: {odds_home} / {odds_away}\n\n"
-                f"👉 <i>Зайди в BetBoom и проверь Value!</i>"
+                f"📊 Pinnacle: <b>{o_h}</b> / <b>{o_a}</b>\n\n"
+                f"👉 <i>Зайди в BetBoom! Сравни кэфы и ставь.</i>"
             )
             send_telegram_message(msg)
             sent_set.add(match_id)
-            matches_found += 1
             
     save_sent(sent_set)
-    print(f"Проверка завершена. Отправлено: {matches_found}")
+    print(f"Проверка завершена. Отправлено: {len(sent_set)}")
 
 if __name__ == "__main__":
-    # Просто вызываем функцию ОДИН раз. Без циклов и задержек!
     check_upcoming_matches()
