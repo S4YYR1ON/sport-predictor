@@ -1,10 +1,10 @@
 name: Telegram Tennis Alerts
 
 on:
-  workflow_dispatch: # Запуск по API от cron-job.org
+  workflow_dispatch: # Запуск только по API от cron-job.org
 
 permissions:
-  contents: write # ДАЕМ ПРАВО НА СОХРАНЕНИЕ ФАЙЛА sent_matches.json
+  contents: write # Чтобы бот мог сохранять файл sent_matches.json
 
 jobs:
   send-alerts:
