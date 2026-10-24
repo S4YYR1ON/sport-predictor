@@ -116,8 +116,9 @@ if page == "Матчи и кэфы":
                 pin_a = e.get("odds_away")
                 
                 if pin_h and pin_a:
-                    col_h.write(f"Pinnacle (П1): **{pin_h}**")
-                    col_a.write(f"Pinnacle (П2): **{pin_a}**")
+                    # Округляем для красивого вывода в интерфейсе
+                    col_h.write(f"Pinnacle (П1): **{float(pin_h):.2f}**")
+                    col_a.write(f"Pinnacle (П2): **{float(pin_a):.2f}**")
                     
                     # Считаем вероятности Pinnacle (с удалением маржи)
                     prob_h = 1 / float(pin_h)
