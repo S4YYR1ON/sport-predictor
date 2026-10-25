@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 from datetime import datetime, timezone
 
 TG_TOKEN = os.getenv("TG_TOKEN")
@@ -20,52 +21,35 @@ def save_sent(sent_set):
     with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
 
 def send_telegram_message(text):
-    if not TG_TOKEN or not TG_CHAT_IDS: 
-        print("Ошибка: Нет токена или ID")
-        return
+    if not TG_TOKEN or not TG_CHAT_IDS: return
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
     for chat_id in TG_CHAT_IDS:
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
         try:
-            r = requests.post(url, json=payload, timeout=10)
-            if r.status_code == 200:
-                print(f"Сообщение отправлено для {chat_id}")
-            else:
-                print(f"Ошибка ТГ для {chat_id}: {r.text}")
+            requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=10)
         except Exception as e:
-            print(f"Ошибка ТГ для {chat_id}: {e}")
+            print(f"Ошибка ТГ: {e}")
 
-def check_upcoming_matches():
-    if not PINNAPI_KEY: 
-        print("Ошибка: Нет PINNAPI_KEY")
-        return
-        
+def check_upcoming_matches(sent_set):
+    if not PINNAPI_KEY: return
+    
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     headers = {"x-portal-apikey": PINNAPI_KEY}
     
     try:
         r = requests.get(url, headers=headers, params={"sport_id": 2}, timeout=15)
         data = r.json()
-        events_list = data if isinstance(data, list) else data.get("events", data.get("fixtures", []))
+        events_list = data if isinstance(data, list) else data.get("events", [])
     except Exception as e:
         print(f"Ошибка Pinnapi: {e}")
         return
 
     now_utc = datetime.now(timezone.utc)
-    sent_set = load_sent()
     matches_found = 0
-    total_events = len(events_list)
-    print(f"Получено событий от Pinnapi: {total_events}")
     
     for ev in events_list:
-        home = ev.get("home")
-        away = ev.get("away")
+        home, away = ev.get("home"), ev.get("away")
         if not home or not away: continue
-            
-        # ФИЛЬТР 1: Отсекаем рынки на Тоталы
         if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
-            
-        # ФИЛЬТР 2: Отсекаем парные матчи
         if "/" in home or "/" in away: continue
 
         start_ts = ev.get("start") or ev.get("starts")
@@ -79,49 +63,43 @@ def check_upcoming_matches():
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        # Если матч начнется в ближайшие 10 минут (но не прошел)
-        if 0 < time_left <= 10:
-            print(f"Найден подходящий матч: {home} - {away} (через {time_left:.1f} мин). Уже отправлен? {match_id in sent_set}")
+        # Окно от 1 до 10 минут
+        if 0 < time_left <= 10 and match_id not in sent_set:
+            odds_home, odds_away = "?", "?"
+            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
+            if isinstance(ml, dict):
+                odds_home, odds_away = ml.get("home", "?"), ml.get("away", "?")
             
-            if match_id not in sent_set:
-                odds_home, odds_away = "?", "?"
-                periods = ev.get("periods") or {}
-                main = periods.get("num_0") or {}
-                ml = main.get("money_line")
-                if isinstance(ml, dict):
-                    odds_home = ml.get("home", "?")
-                    odds_away = ml.get("away", "?")
+            try:
+                o_h, o_a = float(odds_home), float(odds_away)
+                if min(o_h, o_a) < 1.15 or max(o_h, o_a) > 15.0: continue
+                o_h_str, o_a_str = f"{o_h:.2f}", f"{o_a:.2f}"
+            except:
+                o_h_str, o_a_str = odds_home, odds_away
                 
-                try:
-                    o_h = float(odds_home)
-                    o_a = float(odds_away)
-                    
-                    # ФИЛЬТР МУСОРА: Пропускаем матчи с диким перекосом кэфов
-                    if min(o_h, o_a) < 1.15 or max(o_h, o_a) > 15.0:
-                        print(f"Пропущен мусорный матч: {home} - {away} (кэфы: {o_h}/{o_a})")
-                        continue # Переходим к следующему матчу
-                        
-                    o_h_str = f"{o_h:.2f}"
-                    o_a_str = f"{o_a:.2f}"
-                except:
-                    o_h_str, o_a_str = odds_home, odds_away
-                    
-                # Округляем время до целых минут (минимум 1 минута, чтобы не писать "через 0 мин")
-                mins_left = max(1, int(time_left))
-                
-                msg = (
-                    f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
-                    f"🏆 <b>{home}</b> — <b>{away}</b>\n"
-                    f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
-                    f"👉 <i>Зайди в BetBoom!</i>"
-                )
-                
-                send_telegram_message(msg)
-                sent_set.add(match_id)
-                matches_found += 1
-                
-    save_sent(sent_set)
-    print(f"Проверка завершена. Отправлено: {matches_found}")
+            mins_left = max(1, int(time_left))
+            msg = (
+                f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
+                f"🏆 <b>{home}</b> — <b>{away}</b>\n"
+                f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
+                f"👉 <i>Зайди в BetBoom!</i>"
+            )
+            send_telegram_message(msg)
+            sent_set.add(match_id)
+            matches_found += 1
+            
+    if matches_found > 0:
+        print(f"Отправлено: {matches_found}")
+        save_sent(sent_set)
 
 if __name__ == "__main__":
-    check_upcoming_matches()
+    print("Бот запущен в режиме 24/7 (5.5 часов на цикл)...")
+    sent_set = load_sent()
+    
+    # Работаем 5.5 часов (19800 секунд)
+    start_time = time.time()
+    while time.time() - start_time < 19800:
+        check_upcoming_matches(sent_set)
+        time.sleep(300) # Спим ровно 5 минут
+        
+    print("Цикл завершен. GitHub запустит следующий.")
