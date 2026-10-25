@@ -1,10 +1,12 @@
 name: Telegram Tennis Alerts
 
 on:
-  workflow_dispatch: # Запуск только по API от cron-job.org
+  schedule:
+    - cron: '0 */6 * * *' # Запуск каждые 6 часов (00:00, 06:00, 12:00, 18:00 UTC)
+  workflow_dispatch: # Возможность запустить вручную
 
 permissions:
-  contents: write # Чтобы бот мог сохранять файл sent_matches.json
+  contents: write
 
 jobs:
   send-alerts:
@@ -26,6 +28,7 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           PINNAPI_API_KEY: ${{ secrets.PINNAPI_API_KEY }}
+        # GitHub будет убивать процесс через 6 часов
         run: python telegram_bot.py
 
       - name: Commit sent matches
