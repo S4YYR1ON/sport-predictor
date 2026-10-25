@@ -93,17 +93,29 @@ def check_upcoming_matches():
                     odds_away = ml.get("away", "?")
                 
                 try:
-                    o_h = f"{float(odds_home):.2f}"
-                    o_a = f"{float(odds_away):.2f}"
-                except:
-                    o_h, o_a = odds_home, odds_away
+                    o_h = float(odds_home)
+                    o_a = float(odds_away)
                     
+                    # ФИЛЬТР МУСОРА: Пропускаем матчи с диким перекосом кэфов
+                    if min(o_h, o_a) < 1.15 or max(o_h, o_a) > 15.0:
+                        print(f"Пропущен мусорный матч: {home} - {away} (кэфы: {o_h}/{o_a})")
+                        continue # Переходим к следующему матчу
+                        
+                    o_h_str = f"{o_h:.2f}"
+                    o_a_str = f"{o_a:.2f}"
+                except:
+                    o_h_str, o_a_str = odds_home, odds_away
+                    
+                # Округляем время до целых минут (минимум 1 минута, чтобы не писать "через 0 мин")
+                mins_left = max(1, int(time_left))
+                
                 msg = (
-                    f"🚨 <b>Скоро матч!</b> 🚨\n"
+                    f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
                     f"🏆 <b>{home}</b> — <b>{away}</b>\n"
-                    f"📊 Pinnacle: <b>{o_h}</b> / <b>{o_a}</b>\n\n"
+                    f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
                     f"👉 <i>Зайди в BetBoom!</i>"
                 )
+                
                 send_telegram_message(msg)
                 sent_set.add(match_id)
                 matches_found += 1
