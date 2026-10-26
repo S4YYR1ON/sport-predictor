@@ -2,14 +2,14 @@ import os
 import json
 import requests
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from livetennisapi import LiveTennisAPI
 
 TG_TOKEN = os.getenv("TG_TOKEN")
 TG_CHAT_IDS_STR = os.getenv("TG_CHAT_ID", "")
 TG_CHAT_IDS = [cid.strip() for cid in TG_CHAT_IDS_STR.split(",") if cid.strip()]
 PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
-LIVETENNIS_KEY = os.getenv("LIVETENNIS_API_KEY") # НОВЫЙ КЛЮЧ
+LIVETENNIS_KEY = os.getenv("LIVETENNIS_API_KEY")
 SENT_FILE = "sent_matches.json"
 
 def load_sent():
@@ -31,7 +31,6 @@ def send_telegram_message(text):
         except Exception as e:
             print(f"Ошибка ТГ: {e}")
 
-# Функция для получения точного времени из Live Tennis API
 def get_livetennis_times():
     times = {}
     if not LIVETENNIS_KEY: return times
@@ -44,8 +43,6 @@ def get_livetennis_times():
                 
                 p1 = str(getattr(match, 'player1_name', '')).lower()
                 p2 = str(getattr(match, 'player2_name', '')).lower()
-                
-                # Берем только фамилии (последнее слово) для совмещения с Pinnacle
                 p1_last = p1.split()[-1] if p1 else ""
                 p2_last = p2.split()[-1] if p2 else ""
                 
@@ -55,7 +52,6 @@ def get_livetennis_times():
                     dt_utc = datetime.fromisoformat(clean_time)
                     if dt_utc.tzinfo is None:
                         dt_utc = dt_utc.replace(tzinfo=timezone.utc)
-                    # Ключ: "фамилия1_фамилия2"
                     times[f"{p1_last}_{p2_last}"] = dt_utc
     except Exception as e:
         print(f"Ошибка LiveTennis: {e}")
@@ -69,6 +65,9 @@ def check_upcoming_matches(sent_set, lt_times):
     
     try:
         r = requests.get(url, headers=headers, params={"sport_id": 2}, timeout=15)
+        if r.status_code == 429:
+            print("!!! ЛИМИТ ЗАПРОСОВ PINNAPI ИСЧЕРПАН (429) !!!")
+            return
         data = r.json()
         events_list = data if isinstance(data, list) else data.get("events", [])
     except Exception as e:
@@ -84,13 +83,10 @@ def check_upcoming_matches(sent_set, lt_times):
         if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
         if "/" in home or "/" in away: continue
 
-        # Ищем время в Live Tennis по фамилиям
         h_last = home.lower().split()[-1]
         a_last = away.lower().split()[-1]
-        
         lt_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
         
-        # Если Live Tennis знает точное время - используем его. Иначе - время Pinnacle
         if lt_time:
             match_time = lt_time
         else:
@@ -104,7 +100,6 @@ def check_upcoming_matches(sent_set, lt_times):
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        # Окно от 1 до 6 минут
         if 0 < time_left <= 6 and match_id not in sent_set:
             odds_home, odds_away = "?", "?"
             ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
@@ -134,24 +129,37 @@ def check_upcoming_matches(sent_set, lt_times):
         save_sent(sent_set)
 
 if __name__ == "__main__":
-    print("Бот запущен в режиме 24/7 с синхронизацией Live Tennis...")
+    print("Бот запущен с защитой лимитов (работа днем, пауза 10 мин)...")
     sent_set = load_sent()
     
-    # Работаем 5.5 часов (19800 секунд)
     start_time = time.time()
     lt_cache = {}
     last_lt_update = 0
     
+    # Работаем 5.5 часов (19800 секунд)
     while time.time() - start_time < 19800:
+        # Получаем текущее время по МСК (UTC + 3)
+        now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
+        current_hour = now_msk.hour
+        
+        # Если сейчас ночь (с 0:00 до 8:00 утра) - спим
+        if 0 <= current_hour < 8:
+            print(f"Ночь на дворе ({now_msk.strftime('%H:%M')} МСК). Сплю 1 час, чтобы не тратить лимиты...")
+            time.sleep(3600) # Спим 1 час
+            continue
+        
         current_time = time.time()
         
-        # Обновляем время из Live Tennis только раз в 20 минут (1200 секунд), чтобы не спалить лимиты
-        if current_time - last_lt_update > 1200:
-            print("Обновляю расписание из Live Tennis API...")
+        # Обновляем время из Live Tennis раз в 30 минут (1800 секунд)
+        if current_time - last_lt_update > 1800:
+            print(f"[{now_msk.strftime('%H:%M')}] Обновляю расписание из Live Tennis...")
             lt_cache = get_livetennis_times()
             last_lt_update = current_time
             
+        print(f"[{now_msk.strftime('%H:%M')}] Проверяю Pinnacle...")
         check_upcoming_matches(sent_set, lt_cache)
-        time.sleep(300) # Спим ровно 5 минут
+        
+        # Спим 10 минут (600 секунд)
+        time.sleep(600)
         
     print("Цикл завершен. GitHub запустит следующий.")
