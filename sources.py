@@ -50,6 +50,8 @@ def get_pinnapi_tennis_events():
 
     try:
         r = requests.get(url, headers=headers, params=params, timeout=TIMEOUT)
+        if r.status_code == 429:
+            return [], "⏳ Pinnapi временно ограничил запросы (слишком много попыток). Подождите 5-10 минут и нажмите кнопку снова."
         r.raise_for_status()
         data = r.json()
         
