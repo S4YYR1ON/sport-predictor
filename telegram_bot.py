@@ -100,7 +100,7 @@ def check_upcoming_matches(sent_set, lt_times):
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        if 0 < time_left <= 6 and match_id not in sent_set:
+        if 0 < time_left <= 10 and match_id not in sent_set:
             odds_home, odds_away = "?", "?"
             ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
             if isinstance(ml, dict):
