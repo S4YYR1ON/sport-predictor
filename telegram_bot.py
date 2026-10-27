@@ -41,10 +41,13 @@ def get_livetennis_times():
                 tour = str(getattr(match, 'tour', '')).lower()
                 if tour not in ['atp', 'wta']: continue
                 
-                p1 = str(getattr(match, 'player1_name', '')).lower()
-                p2 = str(getattr(match, 'player2_name', '')).lower()
+                p1 = str(getattr(match, 'player1_name', '')).lower().strip()
+                p2 = str(getattr(match, 'player2_name', '')).lower().strip()
+                
+                # Безопасное извлечение последнего слова
                 p1_last = p1.split()[-1] if p1 else ""
                 p2_last = p2.split()[-1] if p2 else ""
+                if not p1_last or not p2_last: continue
                 
                 start_time_raw = getattr(match, 'start_time', None)
                 if start_time_raw:
@@ -78,8 +81,10 @@ def check_upcoming_matches(sent_set, lt_times):
     matches_found = 0
     
     for ev in events_list:
-        home, away = ev.get("home"), ev.get("away")
+        home = str(ev.get("home", "")).strip()
+        away = str(ev.get("away", "")).strip()
         if not home or not away: continue
+        
         if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
         if "/" in home or "/" in away: continue
 
@@ -88,8 +93,12 @@ def check_upcoming_matches(sent_set, lt_times):
         if status in ["finished", "ended", "live", "inprogress", "started", "settled", "cancelled"]:
             continue
 
-        h_last = home.lower().split()[-1]
-        a_last = away.lower().split()[-1]
+        h_parts = home.lower().split()
+        a_parts = away.lower().split()
+        if not h_parts or not a_parts: continue
+        h_last = h_parts[-1]
+        a_last = a_parts[-1]
+
         lt_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
         
         if lt_time:
@@ -102,7 +111,7 @@ def check_upcoming_matches(sent_set, lt_times):
                 match_time = datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
             except: continue
 
-        # ФИЛЬТР 2: Если матч должен был начаться более 2 часов назад, это мусор
+        # ФИЛЬТР 2: Если матч должен был начаться более 2 часов назад (зомби-матч)
         if match_time < now_utc - timedelta(hours=2):
             continue
 
@@ -137,92 +146,35 @@ def check_upcoming_matches(sent_set, lt_times):
         print(f"Отправлено: {matches_found}")
         save_sent(sent_set)
 
-    now_utc = datetime.now(timezone.utc)
-    matches_found = 0
-    
-    for ev in events_list:
-        home, away = ev.get("home"), ev.get("away")
-        if not home or not away: continue
-        if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
-        if "/" in home or "/" in away: continue
-
-        h_last = home.lower().split()[-1]
-        a_last = away.lower().split()[-1]
-        lt_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
-        
-        if lt_time:
-            match_time = lt_time
-        else:
-            start_ts = ev.get("start") or ev.get("starts")
-            if not start_ts: continue
-            try:
-                clean = start_ts.split(".")[0].replace("Z", "")
-                match_time = datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
-            except: continue
-
-        time_left = (match_time - now_utc).total_seconds() / 60.0
-        match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
-
-        if 0 < time_left <= 10 and match_id not in sent_set:
-            odds_home, odds_away = "?", "?"
-            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
-            if isinstance(ml, dict):
-                odds_home, odds_away = ml.get("home", "?"), ml.get("away", "?")
-            
-            try:
-                o_h, o_a = float(odds_home), float(odds_away)
-                if min(o_h, o_a) < 1.40 or max(o_h, o_a) > 15.0: continue
-                o_h_str, o_a_str = f"{o_h:.2f}", f"{o_a:.2f}"
-            except:
-                o_h_str, o_a_str = odds_home, odds_away
-                
-            mins_left = max(1, int(time_left))
-            msg = (
-                f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
-                f"🏆 <b>{home}</b> — <b>{away}</b>\n"
-                f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
-                f"👉 <i>Зайди в BetBoom!</i>"
-            )
-            send_telegram_message(msg)
-            sent_set.add(match_id)
-            matches_found += 1
-            
-    if matches_found > 0:
-        print(f"Отправлено: {matches_found}")
-        save_sent(sent_set)
-
 if __name__ == "__main__":
-    print("Бот запущен с защитой лимитов (работа днем, пауза 10 мин)...")
+    print("Бот запущен с защитой лимитов...")
     sent_set = load_sent()
     
     start_time = time.time()
     lt_cache = {}
     last_lt_update = 0
     
-    # Работаем 5.5 часов (19800 секунд)
     while time.time() - start_time < 19800:
-        # Получаем текущее время по МСК (UTC + 3)
         now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
         current_hour = now_msk.hour
         
-        # Если сейчас ночь (с 0:00 до 8:00 утра) - спим
+        # Ночной режим (с 0:00 до 8:00 МСК)
         if 0 <= current_hour < 8:
-            print(f"Ночь на дворе ({now_msk.strftime('%H:%M')} МСК). Сплю 1 час, чтобы не тратить лимиты...")
-            time.sleep(3600) # Спим 1 час
+            print(f"Ночь на дворе ({now_msk.strftime('%H:%M')} МСК). Сплю 1 час...")
+            time.sleep(3600) 
             continue
         
         current_time = time.time()
         
-        # Обновляем время из Live Tennis раз в 30 минут (1800 секунд)
+        # Обновляем время из Live Tennis раз в 30 минут
         if current_time - last_lt_update > 1800:
-            print(f"[{now_msk.strftime('%H:%M')}] Обновляю расписание из Live Tennis...")
+            print(f"[{now_msk.strftime('%H:%M')}] Обновляю расписание Live Tennis...")
             lt_cache = get_livetennis_times()
             last_lt_update = current_time
             
         print(f"[{now_msk.strftime('%H:%M')}] Проверяю Pinnacle...")
         check_upcoming_matches(sent_set, lt_cache)
         
-        # Спим 10 минут (600 секунд)
-        time.sleep(600)
+        time.sleep(600) # Спим 10 минут
         
-    print("Цикл завершен. GitHub запустит следующий.")
+    print("Цикл завершен.")
