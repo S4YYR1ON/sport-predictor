@@ -105,7 +105,7 @@ def extract_markets(main_period):
             u_price = f"{float(u_price):.2f}"
         except: pass
         
-        markets["total"] = f"ТБ({points}): {o_price} | ТМ({points}): {u_price}"
+        markets["total"] = f"ТМ({points}): {u_price} | ТБ({points}): {o_price}"
             
     return markets
 
