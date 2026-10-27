@@ -87,8 +87,9 @@ def extract_markets(main_period):
             h_price = f"{float(h_price):.2f}"
             a_price = f"{float(a_price):.2f}"
         except: pass
-        
-        markets["spread"] = f"Ф1({hdp}): {h_price} | Ф2({-float(hdp)}): {a_price}"
+            
+        # Для Фор
+        markets["spread"] = f"Ф1({hdp}) сет: {h_price} | Ф2({-float(hdp)}) сет: {a_price}"
             
     # 3. Тоталы (Totals)
     totals = main_period.get("totals")
@@ -104,8 +105,9 @@ def extract_markets(main_period):
             o_price = f"{float(o_price):.2f}"
             u_price = f"{float(u_price):.2f}"
         except: pass
-        
-        markets["total"] = f"ТМ({points}): {u_price} | ТБ({points}): {o_price}"
+            
+        # Для Тоталов
+        markets["total"] = f"ТМ({points}) сет: {u_price} | ТБ({points}) сет: {o_price}"
             
     return markets
 
