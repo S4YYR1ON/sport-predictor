@@ -60,14 +60,14 @@ def get_livetennis_times():
     return times
 
 def extract_markets(main_period):
-    """Извлекает рынки (исход, форы, тоталы) из JSON Pinnapi с защитой от ошибок"""
+    """Правильное извлечение рынков из структуры Pinnapi (словари с ключами линий)"""
     markets = {
         "ml_home": "?", "ml_away": "?",
-        "spread_home": None, "spread_away": None,
-        "total_over": None, "total_under": None
+        "spread": None,
+        "total": None
     }
     
-    # 1. Исход (Moneyline)
+    # 1. Исход
     ml = main_period.get("money_line")
     if isinstance(ml, dict):
         markets["ml_home"] = ml.get("home", "?")
@@ -75,21 +75,37 @@ def extract_markets(main_period):
         
     # 2. Форы (Spreads)
     spreads = main_period.get("spreads")
-    if isinstance(spreads, dict):
-        home_data = spreads.get("home", {})
-        away_data = spreads.get("away", {})
-        if home_data and away_data:
-            markets["spread_home"] = f"Ф1({home_data.get('hdp')}): {home_data.get('price')}"
-            markets["spread_away"] = f"Ф2({away_data.get('hdp')}): {away_data.get('price')}"
+    if isinstance(spreads, dict) and spreads:
+        # Берем первую попавшуюся линию из словаря (обычно она одна основная)
+        first_key = list(spreads.keys())[0]
+        sp_data = spreads[first_key]
+        hdp = sp_data.get("hdp", "")
+        h_price = sp_data.get("home", "?")
+        a_price = sp_data.get("away", "?")
+        
+        try:
+            h_price = f"{float(h_price):.2f}"
+            a_price = f"{float(a_price):.2f}"
+        except: pass
+        
+        markets["spread"] = f"Ф1({hdp}): {h_price} | Ф2({-float(hdp)}): {a_price}"
             
     # 3. Тоталы (Totals)
     totals = main_period.get("totals")
-    if isinstance(totals, dict):
-        over_data = totals.get("over", {})
-        under_data = totals.get("under", {})
-        if over_data and under_data:
-            markets["total_over"] = f"ТБ({over_data.get('points')}): {over_data.get('price')}"
-            markets["total_under"] = f"ТМ({under_data.get('points')}): {under_data.get('price')}"
+    if isinstance(totals, dict) and totals:
+        # Берем первую линию (обычно 2.5 сета)
+        first_key = list(totals.keys())[0]
+        tot_data = totals[first_key]
+        points = tot_data.get("points", "")
+        o_price = tot_data.get("over", "?")
+        u_price = tot_data.get("under", "?")
+        
+        try:
+            o_price = f"{float(o_price):.2f}"
+            u_price = f"{float(u_price):.2f}"
+        except: pass
+        
+        markets["total"] = f"ТБ({points}): {o_price} | ТМ({points}): {u_price}"
             
     return markets
 
@@ -148,37 +164,31 @@ def check_upcoming_matches(sent_set, lt_times):
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        if 0 < time_left <= 12 and match_id not in sent_set:
+        if 0 < time_left <= 12 and match_id not in sent_set: # Окно 15 минут
             periods = ev.get("periods", {})
             main_period = periods.get("num_0", {})
             
-            print(f"\n--- ОТЛАДКА ДЛЯ МАТЧА: {home} - {away} ---")
-            print(f"Доступные периоды: {list(periods.keys())}")
-            print(f"Содержимое главного периода: {main_period}")   
-            
             markets = extract_markets(main_period)
             
-            # Проверяем, что хотя бы на исход есть кэфы, чтобы не присылать пустоту
             try:
                 o_h = float(markets["ml_home"])
                 o_a = float(markets["ml_away"])
                 if min(o_h, o_a) < 1.40 or max(o_h, o_a) > 15.0: continue
+                ml_str = f"{o_h:.2f} / {o_a:.2f}"
             except:
-                continue # Если кэфов на исход нет, пропускаем
+                continue
 
             mins_left = max(1, int(time_left))
             
             # Формируем сообщение
             msg = f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
             msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
+            msg += f"<b>Исход:</b> {ml_str}\n"
             
-            msg += f"<b>Исход:</b> {markets['ml_home']} / {markets['ml_away']}\n"
-            
-            if markets['spread_home']:
-                msg += f"<b>Фора:</b> {markets['spread_home']} | {markets['spread_away']}\n"
-                
-            if markets['total_over']:
-                msg += f"<b>Тотал:</b> {markets['total_over']} | {markets['total_under']}\n"
+            if markets["spread"]:
+                msg += f"<b>Фора:</b> {markets['spread']}\n"
+            if markets["total"]:
+                msg += f"<b>Тотал:</b> {markets['total']}\n"
                 
             msg += f"\n👉 <i>Сравни с BetBoom!</i>"
             
