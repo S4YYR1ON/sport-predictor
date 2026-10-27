@@ -83,6 +83,69 @@ def check_upcoming_matches(sent_set, lt_times):
         if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
         if "/" in home or "/" in away: continue
 
+        # ФИЛЬТР 1: Проверяем статус. Если матч уже завершен или идет, пропускаем.
+        status = str(ev.get("status", "")).lower()
+        if status in ["finished", "ended", "live", "inprogress", "started", "settled", "cancelled"]:
+            continue
+
+        h_last = home.lower().split()[-1]
+        a_last = away.lower().split()[-1]
+        lt_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
+        
+        if lt_time:
+            match_time = lt_time
+        else:
+            start_ts = ev.get("start") or ev.get("starts")
+            if not start_ts: continue
+            try:
+                clean = start_ts.split(".")[0].replace("Z", "")
+                match_time = datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
+            except: continue
+
+        # ФИЛЬТР 2: Если матч должен был начаться более 2 часов назад, это мусор
+        if match_time < now_utc - timedelta(hours=2):
+            continue
+
+        time_left = (match_time - now_utc).total_seconds() / 60.0
+        match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
+
+        if 0 < time_left <= 10 and match_id not in sent_set:
+            odds_home, odds_away = "?", "?"
+            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
+            if isinstance(ml, dict):
+                odds_home, odds_away = ml.get("home", "?"), ml.get("away", "?")
+            
+            try:
+                o_h, o_a = float(odds_home), float(odds_away)
+                if min(o_h, o_a) < 1.40 or max(o_h, o_a) > 15.0: continue
+                o_h_str, o_a_str = f"{o_h:.2f}", f"{o_a:.2f}"
+            except:
+                o_h_str, o_a_str = odds_home, odds_away
+                
+            mins_left = max(1, int(time_left))
+            msg = (
+                f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
+                f"🏆 <b>{home}</b> — <b>{away}</b>\n"
+                f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
+                f"👉 <i>Зайди в BetBoom!</i>"
+            )
+            send_telegram_message(msg)
+            sent_set.add(match_id)
+            matches_found += 1
+            
+    if matches_found > 0:
+        print(f"Отправлено: {matches_found}")
+        save_sent(sent_set)
+
+    now_utc = datetime.now(timezone.utc)
+    matches_found = 0
+    
+    for ev in events_list:
+        home, away = ev.get("home"), ev.get("away")
+        if not home or not away: continue
+        if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
+        if "/" in home or "/" in away: continue
+
         h_last = home.lower().split()[-1]
         a_last = away.lower().split()[-1]
         lt_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
