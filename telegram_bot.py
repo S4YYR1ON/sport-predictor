@@ -152,6 +152,10 @@ def check_upcoming_matches(sent_set, lt_times):
             periods = ev.get("periods", {})
             main_period = periods.get("num_0", {})
             
+            print(f"\n--- ОТЛАДКА ДЛЯ МАТЧА: {home} - {away} ---")
+            print(f"Доступные периоды: {list(periods.keys())}")
+            print(f"Содержимое главного периода: {main_period}")   
+            
             markets = extract_markets(main_period)
             
             # Проверяем, что хотя бы на исход есть кэфы, чтобы не присылать пустоту
