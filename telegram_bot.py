@@ -148,7 +148,7 @@ def check_upcoming_matches(sent_set, lt_times):
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
-        if 0 < time_left <= 10 and match_id not in sent_set:
+        if 0 < time_left <= 12 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main_period = periods.get("num_0", {})
             
