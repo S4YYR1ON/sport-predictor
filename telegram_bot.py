@@ -44,7 +44,6 @@ def get_livetennis_times():
                 p1 = str(getattr(match, 'player1_name', '')).lower().strip()
                 p2 = str(getattr(match, 'player2_name', '')).lower().strip()
                 
-                # Безопасное извлечение последнего слова
                 p1_last = p1.split()[-1] if p1 else ""
                 p2_last = p2.split()[-1] if p2 else ""
                 if not p1_last or not p2_last: continue
@@ -59,6 +58,40 @@ def get_livetennis_times():
     except Exception as e:
         print(f"Ошибка LiveTennis: {e}")
     return times
+
+def extract_markets(main_period):
+    """Извлекает рынки (исход, форы, тоталы) из JSON Pinnapi с защитой от ошибок"""
+    markets = {
+        "ml_home": "?", "ml_away": "?",
+        "spread_home": None, "spread_away": None,
+        "total_over": None, "total_under": None
+    }
+    
+    # 1. Исход (Moneyline)
+    ml = main_period.get("money_line")
+    if isinstance(ml, dict):
+        markets["ml_home"] = ml.get("home", "?")
+        markets["ml_away"] = ml.get("away", "?")
+        
+    # 2. Форы (Spreads)
+    spreads = main_period.get("spreads")
+    if isinstance(spreads, dict):
+        home_data = spreads.get("home", {})
+        away_data = spreads.get("away", {})
+        if home_data and away_data:
+            markets["spread_home"] = f"Ф1({home_data.get('hdp')}): {home_data.get('price')}"
+            markets["spread_away"] = f"Ф2({away_data.get('hdp')}): {away_data.get('price')}"
+            
+    # 3. Тоталы (Totals)
+    totals = main_period.get("totals")
+    if isinstance(totals, dict):
+        over_data = totals.get("over", {})
+        under_data = totals.get("under", {})
+        if over_data and under_data:
+            markets["total_over"] = f"ТБ({over_data.get('points')}): {over_data.get('price')}"
+            markets["total_under"] = f"ТМ({under_data.get('points')}): {under_data.get('price')}"
+            
+    return markets
 
 def check_upcoming_matches(sent_set, lt_times):
     if not PINNAPI_KEY: return
@@ -84,11 +117,9 @@ def check_upcoming_matches(sent_set, lt_times):
         home = str(ev.get("home", "")).strip()
         away = str(ev.get("away", "")).strip()
         if not home or not away: continue
-        
         if "(Games)" in home or "(Games)" in away or "(Sets)" in home or "(Sets)" in away: continue
         if "/" in home or "/" in away: continue
 
-        # ФИЛЬТР 1: Проверяем статус. Если матч уже завершен или идет, пропускаем.
         status = str(ev.get("status", "")).lower()
         if status in ["finished", "ended", "live", "inprogress", "started", "settled", "cancelled"]:
             continue
@@ -111,7 +142,6 @@ def check_upcoming_matches(sent_set, lt_times):
                 match_time = datetime.fromisoformat(clean).replace(tzinfo=timezone.utc)
             except: continue
 
-        # ФИЛЬТР 2: Если матч должен был начаться более 2 часов назад (зомби-матч)
         if match_time < now_utc - timedelta(hours=2):
             continue
 
@@ -119,25 +149,35 @@ def check_upcoming_matches(sent_set, lt_times):
         match_id = ev.get("event_id") or ev.get("id") or f"{home}_{away}"
 
         if 0 < time_left <= 10 and match_id not in sent_set:
-            odds_home, odds_away = "?", "?"
-            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
-            if isinstance(ml, dict):
-                odds_home, odds_away = ml.get("home", "?"), ml.get("away", "?")
+            periods = ev.get("periods", {})
+            main_period = periods.get("num_0", {})
             
+            markets = extract_markets(main_period)
+            
+            # Проверяем, что хотя бы на исход есть кэфы, чтобы не присылать пустоту
             try:
-                o_h, o_a = float(odds_home), float(odds_away)
+                o_h = float(markets["ml_home"])
+                o_a = float(markets["ml_away"])
                 if min(o_h, o_a) < 1.40 or max(o_h, o_a) > 15.0: continue
-                o_h_str, o_a_str = f"{o_h:.2f}", f"{o_a:.2f}"
             except:
-                o_h_str, o_a_str = odds_home, odds_away
-                
+                continue # Если кэфов на исход нет, пропускаем
+
             mins_left = max(1, int(time_left))
-            msg = (
-                f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
-                f"🏆 <b>{home}</b> — <b>{away}</b>\n"
-                f"📊 Pinnacle: <b>{o_h_str}</b> / <b>{o_a_str}</b>\n\n"
-                f"👉 <i>Зайди в BetBoom!</i>"
-            )
+            
+            # Формируем сообщение
+            msg = f"🚨 <b>Матч через {mins_left} мин!</b> 🚨\n"
+            msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
+            
+            msg += f"<b>Исход:</b> {markets['ml_home']} / {markets['ml_away']}\n"
+            
+            if markets['spread_home']:
+                msg += f"<b>Фора:</b> {markets['spread_home']} | {markets['spread_away']}\n"
+                
+            if markets['total_over']:
+                msg += f"<b>Тотал:</b> {markets['total_over']} | {markets['total_under']}\n"
+                
+            msg += f"\n👉 <i>Сравни с BetBoom!</i>"
+            
             send_telegram_message(msg)
             sent_set.add(match_id)
             matches_found += 1
@@ -147,7 +187,7 @@ def check_upcoming_matches(sent_set, lt_times):
         save_sent(sent_set)
 
 if __name__ == "__main__":
-    print("Бот запущен с защитой лимитов...")
+    print("Бот запущен (исходы + тоталы + форы)...")
     sent_set = load_sent()
     
     start_time = time.time()
@@ -158,17 +198,15 @@ if __name__ == "__main__":
         now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
         current_hour = now_msk.hour
         
-        # Ночной режим (с 0:00 до 8:00 МСК)
         if 0 <= current_hour < 8:
-            print(f"Ночь на дворе ({now_msk.strftime('%H:%M')} МСК). Сплю 1 час...")
+            print(f"Ночь ({now_msk.strftime('%H:%M')} МСК). Сплю 1 час...")
             time.sleep(3600) 
             continue
         
         current_time = time.time()
         
-        # Обновляем время из Live Tennis раз в 30 минут
         if current_time - last_lt_update > 1800:
-            print(f"[{now_msk.strftime('%H:%M')}] Обновляю расписание Live Tennis...")
+            print(f"[{now_msk.strftime('%H:%M')}] Обновляю Live Tennis...")
             lt_cache = get_livetennis_times()
             last_lt_update = current_time
             
