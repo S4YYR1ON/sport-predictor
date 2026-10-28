@@ -89,7 +89,7 @@ def extract_markets(main_period):
         except: pass
             
         # Для Фор
-        markets["spread"] = f"Ф1({hdp}) сет: {h_price} | Ф2({-float(hdp)}) сет: {a_price}"
+        markets["spread"] = f"Ф1({hdp}): {h_price} | Ф2({-float(hdp)}): {a_price}"
             
     # 3. Тоталы (Totals)
     totals = main_period.get("totals")
@@ -188,9 +188,9 @@ def check_upcoming_matches(sent_set, lt_times):
             msg += f"<b>Исход:</b> {ml_str}\n"
             
             if markets["spread"]:
-                msg += f"<b>Фора:</b> {markets['spread']}\n"
+                msg += f"<b>Фора (сет):</b> {markets['spread']}\n"
             if markets["total"]:
-                msg += f"<b>Тотал:</b> {markets['total']}\n"
+                msg += f"<b>Тотал (сет):</b> {markets['total']}\n"
                 
             msg += f"\n👉 <i>Сравни с BetBoom!</i>"
             
