@@ -188,9 +188,9 @@ def check_upcoming_matches(sent_set, lt_times):
             msg += f"<b>Исход:</b> {ml_str}\n"
             
             if markets["spread"]:
-                msg += f"<b>Фора (сет):</b> {markets['spread']}\n"
+                msg += f"<b>Фора (сет):</b>\n {markets['spread']}\n"
             if markets["total"]:
-                msg += f"<b>Тотал (сет):</b> {markets['total']}\n"
+                msg += f"<b>Тотал (сет):</b>\n {markets['total']}\n"
                 
             msg += f"\n👉 <i>Сравни с BetBoom!</i>"
             
