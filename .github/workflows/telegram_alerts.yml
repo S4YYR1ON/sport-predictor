@@ -37,3 +37,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add sent_matches.json
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches [skip ci]" && git push)
+          git pull --rebase origin main
+          git push
