@@ -107,7 +107,7 @@ def extract_markets(main_period):
         except: pass
             
         # Для Тоталов
-        markets["total"] = f"ТМ({points}) сет: {u_price} | ТБ({points}) сет: {o_price}"
+        markets["total"] = f"ТМ({points}): {u_price} | ТБ({points}): {o_price}"
             
     return markets
 
