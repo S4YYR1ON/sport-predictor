@@ -2,40 +2,40 @@ name: Telegram Tennis Alerts
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Запуск каждые 6 часов (00:00, 06:00, 12:00, 18:00 UTC)
-  workflow_dispatch: # Возможность запустить вручную
+    - cron: '0 */6 * * *' # Каждые 6 часов
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  send-alerts:
+  run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 350 # 5 часов 50 минут. GitHub убьет процесс, если он зависнет
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
+      
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
+          
       - name: Install dependencies
-        run: pip install requests livetennisapi
-
-      - name: Run Bot Script
+        run: pip install pyTelegramBotAPI requests
+        
+      - name: Run Bot
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           PINNAPI_API_KEY: ${{ secrets.PINNAPI_API_KEY }}
-        # GitHub будет убивать процесс через 6 часов
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROUP_CHAT_ID: ${{ secrets.GROUP_CHAT_ID }}
         run: python telegram_bot.py
-
+        
       - name: Commit sent matches
+        if: always()
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add sent_matches.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches [skip ci]" && git push)
-          git pull --rebase origin main
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches [skip ci]" && git pull --rebase && git push)
