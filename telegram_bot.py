@@ -186,6 +186,8 @@ def handle_bet_reply(message):
     for market, u_odd, p_odd, clv in bets_to_save:
         data = {
             "chat_id": message.chat.id, 
+            "user_id": message.from_user.id, 
+            "username": message.from_user.username or message.from_user.first_name,
             "match_name": match_name, 
             "market": market, 
             "user_odds": u_odd, 
@@ -234,9 +236,12 @@ def handle_callback(call):
 # ==========================================
 @bot.message_handler(commands=['stats'])
 def show_stats(message):
-    res = supabase_request("GET", "telegram_bets?status=neq.open", None)
+    # Ищем ставки только этого пользователя
+    user_id = message.from_user.id
+    res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
+    
     if not res:
-        bot.send_message(GROUP_CHAT_ID, "📊 У тебя пока нет закрытых ставок.", message_thread_id=THREAD_ID_STATS)
+        bot.send_message(GROUP_CHAT_ID, f"📊 {message.from_user.first_name}, у тебя пока нет закрытых ставок.", message_thread_id=THREAD_ID_STATS)
         return
         
     total = len(res)
@@ -244,9 +249,9 @@ def show_stats(message):
     lost = sum(1 for r in res if r["status"] == "lost")
     void = sum(1 for r in res if r["status"] == "void")
     avg_clv = sum(r["clv"] for r in res) / total if total > 0 else 0
-    profit = (won * 1.0) - (lost * 1.0) # Условные единицы
+    profit = (won * 1.0) - (lost * 1.0)
     
-    text = f"📊 <b>Твоя статистика</b>\n\n"
+    text = f"📊 <b>Статистика: {message.from_user.first_name}</b>\n\n"
     text += f"<pre>"
     text += f"Всего ставок:  {total}\n"
     text += f"✅ Побед:       {won}\n"
