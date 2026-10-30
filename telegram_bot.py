@@ -16,8 +16,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 
-# ID тем в Telegram (замени цифры на свои!)
-# Если не знаешь ID темы, оставь 0 (будет писать в основную)
+# ID тем в Telegram
 THREAD_ID_NOTIFICATIONS = int(os.getenv("THREAD_ID_NOTIFICATIONS", 1)) 
 THREAD_ID_MY_BETS = int(os.getenv("THREAD_ID_MY_BETS", 3))
 THREAD_ID_STATS = int(os.getenv("THREAD_ID_STATS", 10))
