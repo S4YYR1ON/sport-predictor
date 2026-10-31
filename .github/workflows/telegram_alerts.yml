@@ -30,6 +30,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GROUP_CHAT_ID: ${{ secrets.GROUP_CHAT_ID }}
+          THREAD_ID_NOTIFICATIONS: ${{ secrets.THREAD_ID_NOTIFICATIONS }}
+          THREAD_ID_MY_BETS: ${{ secrets.THREAD_ID_MY_BETS }}
+          THREAD_ID_STATS: ${{ secrets.THREAD_ID_STATS }}
         run: python telegram_bot.py
         
       - name: Commit sent matches
