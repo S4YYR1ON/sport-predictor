@@ -100,10 +100,10 @@ def check_upcoming_matches():
         match_id = ev.get("event_id") or ev.get("id")
 
         # Диагностика: показываем ВСЕ матчи, до которых меньше 30 минут
-        if 0 < time_left <= 30:
+        if 0 < time_left <= 1440:
             print(f"🔍 Матч: {home} - {away} | Через {time_left:.1f} мин | Уже отправлен? {match_id in sent_set}")
 
-        if 0 < time_left <= 15 and match_id not in sent_set:
+        if 0 < time_left <= 1440 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
