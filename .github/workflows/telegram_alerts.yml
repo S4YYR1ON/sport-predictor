@@ -25,6 +25,7 @@ jobs:
         
       - name: Run Bot
         env:
+          PYTHONUNBUFFERED: 1
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           PINNAPI_API_KEY: ${{ secrets.PINNAPI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
