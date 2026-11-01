@@ -291,6 +291,20 @@ def show_stats(message):
 # ЗАПУСК БОТА
 # ==========================================
 if __name__ == "__main__":
+    # --- ТЕСТ ОТПРАВКИ ---
+    try:
+        print("📤 Пытаюсь отправить тестовое сообщение в группу...")
+        bot.send_message(
+            GROUP_CHAT_ID, 
+            "🛠️ <b>Тестовое сообщение от бота!</b>\nЕсли ты это видишь, значит группа и темы настроены верно.", 
+            parse_mode="HTML",
+            message_thread_id=THREAD_ID_NOTIFICATIONS
+        )
+        print("✅ Тестовое сообщение успешно отправлено!")
+    except Exception as e:
+        print(f"❌ ОШИБКА ОТПРАВКИ ТЕСТА: {e}")
+    # ----------------------
+
     threading.Thread(target=background_worker, daemon=True).start()
     print("Бот запущен в режиме 24/7 (Long Polling)...")
     bot.infinity_polling(timeout=30)
