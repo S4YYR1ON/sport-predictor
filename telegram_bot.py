@@ -47,26 +47,42 @@ def supabase_request(method, endpoint, data=None):
 # ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ О МАТЧАХ)
 # ==========================================
 def check_upcoming_matches():
-    if not PINNAPI_KEY: return
+    print("=== НАЧАЛО ПРОВЕРКИ МАТЧЕЙ ===")
+    if not PINNAPI_KEY: 
+        print("❌ ОШИБКА: PINNAPI_KEY не задан!")
+        return
+    if not GROUP_CHAT_ID:
+        print("❌ ОШИБКА: GROUP_CHAT_ID не задан!")
+        return
+    
+    print(f"✅ GROUP_CHAT_ID = {GROUP_CHAT_ID}")
+    print(f"✅ THREAD_ID_NOTIFICATIONS = {THREAD_ID_NOTIFICATIONS}")
+    
     now_utc = datetime.now(timezone.utc)
     sent_set = set()
     
-    # Загружаем историю отправленных
     if os.path.exists(SENT_FILE):
         try:
             with open(SENT_FILE, "r") as f: 
                 sent_set = set(json.load(f))
+            print(f"📁 Загружено отправленных ранее: {len(sent_set)}")
         except: 
             pass
 
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
         r = requests.get(url, headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
-        if r.status_code != 200: return
+        print(f"📡 Статус Pinnapi: {r.status_code}")
+        if r.status_code != 200: 
+            print(f"❌ ОШИБКА PINNAPI: {r.text[:200]}")
+            return
         events_list = r.json().get("events", [])
-    except: 
+        print(f"📊 Получено событий от Pinnapi: {len(events_list)}")
+    except Exception as e: 
+        print(f"❌ ИСКЛЮЧЕНИЕ PINNAPI: {e}")
         return
 
+    found_count = 0
     for ev in events_list:
         home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
         if not home or not away or "(Games)" in home or "/" in home: 
@@ -83,27 +99,30 @@ def check_upcoming_matches():
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # Если матч через 15 минут и мы его еще не отправляли
+        # Диагностика: показываем ВСЕ матчи, до которых меньше 30 минут
+        if 0 < time_left <= 30:
+            print(f"🔍 Матч: {home} - {away} | Через {time_left:.1f} мин | Уже отправлен? {match_id in sent_set}")
+
         if 0 < time_left <= 15 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
             
-            if not ml or not ml.get("home"): continue
+            if not ml or not ml.get("home"): 
+                print(f"⚠️ Нет кэфов Pinnacle для {home} - {away}, пропускаю")
+                continue
             o_h, o_a = ml.get("home"), ml.get("away")
             
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
             msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
             msg += f"<b>Исход:</b> {o_h:.2f} / {o_a:.2f}\n"
             
-            # Тотал
             totals = main.get("totals", {})
             if totals:
                 best_line = list(totals.keys())[0]
                 t_data = totals[best_line]
                 msg += f"<b>Тотал (сет):</b>\nТМ({best_line}): {t_data.get('under', 0):.2f} | ТБ({best_line}): {t_data.get('over', 0):.2f}\n"
             
-            # Фора
             spreads = main.get("spreads", {})
             if spreads:
                 best_line = list(spreads.keys())[0]
@@ -119,11 +138,15 @@ def check_upcoming_matches():
                     parse_mode="HTML",
                     message_thread_id=THREAD_ID_NOTIFICATIONS
                 )
+                print(f"✅ ОТПРАВЛЕНО: {home} - {away}")
                 sent_set.add(match_id)
                 with open(SENT_FILE, "w") as f: 
                     json.dump(list(sent_set), f)
+                found_count += 1
             except Exception as e:
-                print(f"Ошибка отправки: {e}")
+                print(f"❌ ОШИБКА ОТПРАВКИ: {e}")
+    
+    print(f"=== КОНЕЦ ПРОВЕРКИ. Отправлено: {found_count} ===")
 
 def background_worker():
     while True:
