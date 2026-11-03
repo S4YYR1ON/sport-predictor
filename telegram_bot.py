@@ -25,6 +25,9 @@ THREAD_ID_STATS = int(os.getenv("THREAD_ID_STATS", 0))
 bot = telebot.TeleBot(TG_TOKEN)
 SENT_FILE = "sent_matches.json"
 
+# ==========================================
+# ФИЛЬТР ТОПОВЫХ ЛИГ
+# ==========================================
 def is_top_tournament(league_name):
     """Проверяет, является ли турнир топовым (ATP/WTA), а не ITF/Challenger"""
     if not league_name:
@@ -34,13 +37,14 @@ def is_top_tournament(league_name):
     # Исключаем низшие лиги
     exclude = [
         "itf", "challenger", "w15", "w25", "w35", "w50", "w75", "w100",
-        "m15", "m25", "wta 125", "atp 125", "125k", "doubles", "utr"
+        "m15", "m25", "wta 125", "atp 125", "125k", "utr", "doubles"
     ]
     if any(word in name_lower for word in exclude):
         return False
         
     # Оставляем только ATP или WTA
     return "atp" in name_lower or "wta" in name_lower
+
 # ==========================================
 # РАБОТА С SUPABASE
 # ==========================================
@@ -110,9 +114,8 @@ def check_upcoming_matches():
     now_utc = datetime.now(timezone.utc)
     sent_set = load_sent()
     
-    # Получаем время из Live Tennis
     lt_times = get_livetennis_times()
-    print(f"🕒 Получено временных меток от Live Tennis: {len(lt_times)}")
+    print(f"🕒 Временных меток от Live Tennis: {len(lt_times)}")
 
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
@@ -125,23 +128,36 @@ def check_upcoming_matches():
         return
 
     for ev in events_list:
-        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
+        home = str(ev.get("home", "")).strip()
+        away = str(ev.get("away", "")).strip()
         if not home or not away or "(Games)" in home or "/" in home: continue
 
-        # --- НОВАЯ ПРОВЕРКА ЛИГИ ---
+        # --- ПРИМЕНЯЕМ ФИЛЬТР ТОП-ЛИГ ---
         league_name = ev.get("league_name") or ev.get("league") or ""
         if not is_top_tournament(league_name):
-            continue # Пропускаем ITF и Челленджеры
-        # ---------------------------
-        
-        # Если Live Tennis не знает, пробуем Pinnapi
+            continue
+
+        # --- ИНИЦИАЛИЗИРУЕМ ВРЕМЯ ---
+        match_time = None
+
+        # 1. Пытаемся найти в Live Tennis
+        h_parts = home.lower().split()
+        a_parts = away.lower().split()
+        if h_parts and a_parts:
+            h_last = h_parts[-1]
+            a_last = a_parts[-1]
+            match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
+
+        # 2. Если нет в Live Tennis, берем из Pinnapi
         if not match_time:
             start_ts = ev.get("start") or ev.get("starts")
             if start_ts:
                 try:
                     match_time = datetime.fromisoformat(str(start_ts).split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-                except: pass
+                except: 
+                    pass
 
+        # 3. Если время так и не нашли, пропускаем
         if not match_time:
             continue
 
@@ -149,7 +165,7 @@ def check_upcoming_matches():
         match_id = ev.get("event_id") or ev.get("id")
 
         # Окно 15 минут
-        if 0 < time_left <= 1440 and match_id not in sent_set:
+        if 0 < time_left <= 15 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
@@ -316,7 +332,7 @@ if __name__ == "__main__":
     try:
         print("📤 Отправляю тест...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот запущен! Жду матчи...</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с фильтром топ-лиг!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
