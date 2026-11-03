@@ -37,9 +37,10 @@ jobs:
         run: python telegram_bot.py
         
       - name: Commit sent matches
-        if: always()
+        if: always() # Выполнять, даже если бот упал
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          touch sent_matches.json # Создаем пустой файл, если его нет
           git add sent_matches.json
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update sent matches [skip ci]" && git pull --rebase && git push)
