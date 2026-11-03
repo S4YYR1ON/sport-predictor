@@ -60,17 +60,14 @@ def check_upcoming_matches():
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
         r = requests.get(url, headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
-        print(f"📡 Статус Pinnapi: {r.status_code}")
         if r.status_code != 200: return
         events_list = r.json().get("events", [])
         print(f"📊 Получено событий: {len(events_list)}")
-    except Exception as e: 
-        print(f"❌ Ошибка Pinnapi: {e}")
-        return
+    except: return
 
-    for ev in events_list:
+    for idx, ev in enumerate(events_list):
         home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
-        if not home or not away or "(Games)" in home or "/" in home: continue
+        if not home or not away: continue
 
         start_ts = ev.get("start")
         if not start_ts: continue
@@ -81,6 +78,10 @@ def check_upcoming_matches():
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
+
+        # --- ДИАГНОСТИКА: Выводим первые 5 матчей, чтобы понять, как считается время ---
+        if idx < 5:
+            print(f"DEBUG: {home} - {away} | Время API: {start_ts} | Осталось: {time_left:.1f} мин | Отправлен ранее: {match_id in sent_set}")
 
         if 0 < time_left <= 12 and match_id not in sent_set:
             periods = ev.get("periods", {})
