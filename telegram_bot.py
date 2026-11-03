@@ -65,26 +65,43 @@ def check_upcoming_matches():
         print(f"📊 Получено событий: {len(events_list)}")
     except: return
 
-    for ev in events_list:
-        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
-        if not home or not away or "(Games)" in home or "/" in home: continue
+       for ev in events_list:
+        home = str(ev.get("home", "")).strip()
+        away = str(ev.get("away", "")).strip()
+        
+        # 1. Проверка на пустые имена и парный разряд
+        if not home or not away:
+            continue
+        if "(Games)" in home or "(Games)" in away or "/" in home or "/" in away:
+            continue
 
         start_ts = ev.get("start")
-        if not start_ts: continue
+        if not start_ts: 
+            continue
         
         try:
             match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-        except: continue
+        except: 
+            continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        if 0 < time_left <= 1440 and match_id not in sent_set:  # ОКНО 24 ЧАСА ДЛЯ ТЕСТА
+        # Проверяем условия и пишем, почему пропускаем
+        if 0 < time_left <= 1440:
+            if match_id in sent_set:
+                print(f"⏭️ Пропущен (уже отправляли): {home} - {away}")
+                continue
+                
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
             
-            if not ml or not ml.get("home"): continue
+            if not ml or not ml.get("home"): 
+                print(f"⏭️ Пропущен (нет кэфов Pinnapi): {home} - {away}")
+                continue
+                
+            # ЕСЛИ ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ - ОТПРАВЛЯЕМ
             o_h, o_a = ml.get("home"), ml.get("away")
             
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
