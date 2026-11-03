@@ -131,30 +131,9 @@ def check_upcoming_matches():
     for ev in events_list:
         home = str(ev.get("home", "")).strip()
         away = str(ev.get("away", "")).strip()
-        
-        # Отладка: выводим название лиги и время для первых 5 матчей
-        if debug_count < 5:
-            print(f"⏰ Сырое время: {st}")
-            print(f"⏳ Осталось минут: {time_left:.1f}") # <-- ДОБАВЬ ЭТУ СТРОКУ
-            print(f"--- МАТЧ: {home} - {away} ---")
-            print(f"🔑 Доступные ключи: {list(ev.keys())}")
-            
-            # Пытаемся найти лигу по разным ключам
-            lig = ev.get("league_name") or ev.get("league") or ev.get("tournament")
-            if isinstance(lig, dict):
-                lig = lig.get("name")
-            print(f"🏆 Лига: {lig}")
-            
-            # Пытаемся найти время по разным ключам
-            st = ev.get("start") or ev.get("starts") or ev.get("start_time")
-            print(f"⏰ Сырое время: {st}")
-            print("-------------------------")
-            debug_count += 1
-
-        # --- ДАЛЬШЕ ИДЕТ ОСТАЛЬНОЙ КОД ---
         if not home or not away or "(Games)" in home or "/" in home: continue
 
-        # Пытаемся достать лигу для фильтра
+        # 1. Фильтр топ-лиг
         league_name = ev.get("league_name") or ev.get("league") or ev.get("tournament")
         if isinstance(league_name, dict):
             league_name = league_name.get("name", "")
@@ -162,10 +141,9 @@ def check_upcoming_matches():
         if not is_top_tournament(league_name):
             continue
 
-        # --- ИНИЦИАЛИЗИРУЕМ ВРЕМЯ ---
         match_time = None
 
-        # 1. Пытаемся найти в Live Tennis
+        # 2. Пытаемся найти в Live Tennis
         h_parts = home.lower().split()
         a_parts = away.lower().split()
         if h_parts and a_parts:
@@ -173,7 +151,7 @@ def check_upcoming_matches():
             a_last = a_parts[-1]
             match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
 
-        # 2. Если нет в Live Tennis, берем из Pinnapi
+        # 3. Если нет в Live Tennis, берем из Pinnapi (поле 'starts')
         if not match_time:
             start_ts = ev.get("start") or ev.get("starts")
             if start_ts:
@@ -182,14 +160,19 @@ def check_upcoming_matches():
                 except: 
                     pass
 
-        # 3. Если время так и не нашли, пропускаем
         if not match_time:
             continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # Окно 15 минут
+        # --- ОТЛАДКА (показываем первые 5 валидных матчей) ---
+        if debug_count < 5:
+            print(f"🔍 Матч: {home} - {away} | Лига: {league_name} | Через {time_left:.1f} мин")
+            debug_count += 1
+        # ----------------------------------------------------
+
+        # ТЕСТОВОЕ ОКНО 60 МИНУТ (потом поменяем на 15)
         if 0 < time_left <= 1440 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
