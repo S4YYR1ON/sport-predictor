@@ -128,11 +128,11 @@ def check_upcoming_matches():
         home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
         if not home or not away or "(Games)" in home or "/" in home: continue
 
-        # Ищем время в Live Tennis по фамилиям
-        h_last = home.lower().split()[-1]
-        a_last = away.lower().split()[-1]
-        
-        match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
+        # --- НОВАЯ ПРОВЕРКА ЛИГИ ---
+        league_name = ev.get("league_name") or ev.get("league") or ""
+        if not is_top_tournament(league_name):
+            continue # Пропускаем ITF и Челленджеры
+        # ---------------------------
         
         # Если Live Tennis не знает, пробуем Pinnapi
         if not match_time:
