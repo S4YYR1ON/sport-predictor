@@ -134,6 +134,8 @@ def check_upcoming_matches():
         
         # Отладка: выводим название лиги и время для первых 5 матчей
         if debug_count < 5:
+            print(f"⏰ Сырое время: {st}")
+            print(f"⏳ Осталось минут: {time_left:.1f}") # <-- ДОБАВЬ ЭТУ СТРОКУ
             print(f"--- МАТЧ: {home} - {away} ---")
             print(f"🔑 Доступные ключи: {list(ev.keys())}")
             
@@ -188,7 +190,7 @@ def check_upcoming_matches():
         match_id = ev.get("event_id") or ev.get("id")
 
         # Окно 15 минут
-        if 0 < time_left <= 15 and match_id not in sent_set:
+        if 0 < time_left <= 1440 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
