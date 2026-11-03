@@ -79,16 +79,25 @@ def save_sent(sent_set):
 # ==========================================
 def get_livetennis_times():
     times = {}
-    if not LIVETENNIS_KEY: return times
+    if not LIVETENNIS_KEY: 
+        print("❌ ОШИБКА: LIVETENNIS_KEY не задан в секретах!")
+        return times
     try:
+        print("📡 Запрашиваю Live Tennis API...")
         with LiveTennisAPI(api_key=LIVETENNIS_KEY) as client:
             fixtures = client.list_fixtures(limit=200)
-            for match in fixtures:
+            print(f"📡 Live Tennis вернул матчей: {len(fixtures)}")
+            
+            for idx, match in enumerate(fixtures):
                 tour = str(getattr(match, 'tour', '')).lower()
                 if tour not in ['atp', 'wta']: continue
                 
                 p1 = str(getattr(match, 'player1_name', '')).lower().strip()
                 p2 = str(getattr(match, 'player2_name', '')).lower().strip()
+                
+                # Диагностика первого попавшегося матча
+                if idx == 0:
+                    print(f"🔍 Пример из Live Tennis: {p1} vs {p2} | Время: {getattr(match, 'start_time', None)}")
                 
                 p1_last = p1.split()[-1] if p1 else ""
                 p2_last = p2.split()[-1] if p2 else ""
