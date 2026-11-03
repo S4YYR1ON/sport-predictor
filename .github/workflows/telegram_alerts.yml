@@ -21,7 +21,7 @@ jobs:
           python-version: '3.10'
           
       - name: Install dependencies
-        run: pip install pyTelegramBotAPI requests
+        run: pip install pyTelegramBotAPI requests livetennisapi
         
       - name: Run Bot
         env:
