@@ -324,26 +324,38 @@ def handle_callback(call):
 # ==========================================
 @bot.message_handler(commands=['stats'])
 def show_stats(message):
-    user_id = message.from_user.id
-    res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
-    
-    if not res:
-        s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, f"📊 {message.from_user.first_name}, у тебя пока нет закрытых ставок.", message_thread_id=s_id)
-        return
+    try:
+        user_id = message.from_user.id
+        print(f"📊 Запрос статистики от {user_id}")
         
-    total = len(res)
-    won = sum(1 for r in res if r["status"] == "won")
-    lost = sum(1 for r in res if r["status"] == "lost")
-    void = sum(1 for r in res if r["status"] == "void")
-    avg_clv = sum(r["clv"] for r in res) / total if total > 0 else 0
-    profit = (won * 1.0) - (lost * 1.0)
-    
-    text = f"📊 <b>Статистика: {message.from_user.first_name}</b>\n\n<pre>"
-    text += f"Всего ставок:  {total}\n✅ Побед:       {won}\n❌ Поражений:   {lost}\n🔄 Возвратов:   {void}\n------------------------\n📈 Средний CLV: {avg_clv:+.2%}\n💰 Профит (ед.): {profit:+.1f}</pre>"
-    
-    s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
-    bot.send_message(GROUP_CHAT_ID, text, parse_mode="HTML", message_thread_id=s_id)
+        # Делаем запрос к Supabase
+        res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
+        
+        # Если Supabase вернул ошибку (например, нет колонки user_id)
+        if isinstance(res, dict) and ("message" in res or "error" in res):
+            bot.reply_to(message, f"❌ Ошибка БД: {res.get('message', res)}")
+            return
+            
+        if not res or len(res) == 0:
+            s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
+            bot.send_message(GROUP_CHAT_ID, f"📊 {message.from_user.first_name}, у тебя пока нет закрытых ставок.", message_thread_id=s_id)
+            return
+            
+        total = len(res)
+        won = sum(1 for r in res if r["status"] == "won")
+        lost = sum(1 for r in res if r["status"] == "lost")
+        void = sum(1 for r in res if r["status"] == "void")
+        avg_clv = sum(r["clv"] for r in res) / total if total > 0 else 0
+        profit = (won * 1.0) - (lost * 1.0)
+        
+        text = f"📊 <b>Статистика: {message.from_user.first_name}</b>\n\n<pre>"
+        text += f"Всего ставок:  {total}\n✅ Побед:       {won}\n❌ Поражений:   {lost}\n🔄 Возвратов:   {void}\n------------------------\n📈 Средний CLV: {avg_clv:+.2%}\n💰 Профит (ед.): {profit:+.1f}</pre>"
+        
+        s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
+        bot.send_message(GROUP_CHAT_ID, text, parse_mode="HTML", message_thread_id=s_id)
+        
+    except Exception as e:
+        bot.reply_to(message, f"❌ Системная ошибка: {e}")
 
 # ==========================================
 # ЗАПУСК
