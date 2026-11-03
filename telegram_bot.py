@@ -342,7 +342,7 @@ if __name__ == "__main__":
     try:
         print("📤 Отправляю тест...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с фильтром топ-лиг!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот запущен!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
