@@ -6,12 +6,14 @@ import threading
 from datetime import datetime, timezone, timedelta
 import telebot
 from telebot import types
+from livetennisapi import LiveTennisAPI
 
 # ==========================================
-# НАСТРОЙКИ (Берутся из GitHub Secrets)
+# НАСТРОЙКИ
 # ==========================================
 TG_TOKEN = os.getenv("TG_TOKEN")
 PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
+LIVETENNIS_KEY = os.getenv("LIVETENNIS_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
@@ -53,71 +55,90 @@ def save_sent(sent_set):
     with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
 
 # ==========================================
-# ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ О МАТЧАХ)
+# ВРЕМЯ ИЗ LIVE TENNIS API
+# ==========================================
+def get_livetennis_times():
+    times = {}
+    if not LIVETENNIS_KEY: return times
+    try:
+        with LiveTennisAPI(api_key=LIVETENNIS_KEY) as client:
+            fixtures = client.list_fixtures(limit=200)
+            for match in fixtures:
+                tour = str(getattr(match, 'tour', '')).lower()
+                if tour not in ['atp', 'wta']: continue
+                
+                p1 = str(getattr(match, 'player1_name', '')).lower().strip()
+                p2 = str(getattr(match, 'player2_name', '')).lower().strip()
+                
+                p1_last = p1.split()[-1] if p1 else ""
+                p2_last = p2.split()[-1] if p2 else ""
+                if not p1_last or not p2_last: continue
+                
+                start_time_raw = getattr(match, 'start_time', None)
+                if start_time_raw:
+                    clean_time = str(start_time_raw).replace("Z", "+00:00")
+                    dt_utc = datetime.fromisoformat(clean_time)
+                    if dt_utc.tzinfo is None:
+                        dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+                    times[f"{p1_last}_{p2_last}"] = dt_utc
+    except Exception as e:
+        print(f"❌ Ошибка LiveTennis: {e}")
+    return times
+
+# ==========================================
+# ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ)
 # ==========================================
 def check_upcoming_matches():
     print("=== НАЧАЛО ПРОВЕРКИ МАТЧЕЙ ===")
     if not PINNAPI_KEY: return
     now_utc = datetime.now(timezone.utc)
     sent_set = load_sent()
+    
+    # Получаем время из Live Tennis
+    lt_times = get_livetennis_times()
+    print(f"🕒 Получено временных меток от Live Tennis: {len(lt_times)}")
 
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
         r = requests.get(url, headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
         if r.status_code != 200: return
         events_list = r.json().get("events", [])
-        print(f"📊 Получено событий: {len(events_list)}")
+        print(f"📊 Получено событий от Pinnapi: {len(events_list)}")
     except Exception as e: 
-        print(f"❌ Ошибка API: {e}")
+        print(f"❌ Ошибка API Pinnapi: {e}")
         return
 
-    debug_count = 0
     for ev in events_list:
-        home = str(ev.get("home", "")).strip()
-        away = str(ev.get("away", "")).strip()
-        
-        start_ts = ev.get("start")
-        
-        # ДИАГНОСТИКА ПЕРВЫХ 5 МАТЧЕЙ
-        if debug_count < 5:
-            print(f"--- МАТЧ: {home} vs {away} ---")
-            print(f"Сырое время (start_ts): {start_ts}")
-            
-            if not start_ts:
-                print("❌ ОШИБКА: Нет поля start_ts")
-                debug_count += 1
-                continue
-                
-            try:
-                match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-                time_left = (match_time - now_utc).total_seconds() / 60.0
-                print(f"⏰ Осталось минут: {time_left:.1f}")
-            except Exception as e:
-                print(f"❌ ОШИБКА ПАРСИНГА ВРЕМЕНИ: {e}")
-            
-            print("-------------------------")
-            debug_count += 1
-
-        # Дальше идет обычная логика
+        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
         if not home or not away or "(Games)" in home or "/" in home: continue
-        if not start_ts: continue
+
+        # Ищем время в Live Tennis по фамилиям
+        h_last = home.lower().split()[-1]
+        a_last = away.lower().split()[-1]
         
-        try:
-            match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-        except: continue
+        match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
+        
+        # Если Live Tennis не знает, пробуем Pinnapi
+        if not match_time:
+            start_ts = ev.get("start") or ev.get("starts")
+            if start_ts:
+                try:
+                    match_time = datetime.fromisoformat(str(start_ts).split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
+                except: pass
+
+        if not match_time:
+            continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        if 0 < time_left <= 1440 and match_id not in sent_set:
+        # Окно 15 минут
+        if 0 < time_left <= 15 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
             
-            if not ml or not ml.get("home"): 
-                print(f"⏭️ Пропущен (нет кэфов): {home} - {away}")
-                continue
-                
+            if not ml or not ml.get("home"): continue
             o_h, o_a = ml.get("home"), ml.get("away")
             
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
@@ -150,9 +171,9 @@ def check_upcoming_matches():
 def background_worker():
     while True:
         now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
-        if 0 <= now_msk.hour < 24: # Круглосуточно для теста
+        if 8 <= now_msk.hour < 24: # Работаем днем
             check_upcoming_matches()
-        time.sleep(600) # Пауза 10 минут
+        time.sleep(600) # Спим 10 минут
 
 # ==========================================
 # ОБРАБОТКА ОТВЕТОВ (СОЗДАНИЕ СТАВКИ)
@@ -277,13 +298,12 @@ def show_stats(message):
 # ==========================================
 if __name__ == "__main__":
     try:
-        print("📤 Пытаюсь отправить тестовое сообщение...")
+        print("📤 Отправляю тест...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Тест!</b>", parse_mode="HTML", message_thread_id=t_id)
-        print("✅ Тест отправлен!")
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот запущен! Жду матчи...</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
     threading.Thread(target=background_worker, daemon=True).start()
-    print("Бот запущен...")
+    print("Бот запущен в режиме 24/7...")
     bot.infinity_polling(timeout=30)
