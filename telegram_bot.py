@@ -71,11 +71,35 @@ def check_upcoming_matches():
         print(f"❌ Ошибка API: {e}")
         return
 
+    debug_count = 0
     for ev in events_list:
-        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
-        if not home or not away or "(Games)" in home or "/" in home: continue
-
+        home = str(ev.get("home", "")).strip()
+        away = str(ev.get("away", "")).strip()
+        
         start_ts = ev.get("start")
+        
+        # ДИАГНОСТИКА ПЕРВЫХ 5 МАТЧЕЙ
+        if debug_count < 5:
+            print(f"--- МАТЧ: {home} vs {away} ---")
+            print(f"Сырое время (start_ts): {start_ts}")
+            
+            if not start_ts:
+                print("❌ ОШИБКА: Нет поля start_ts")
+                debug_count += 1
+                continue
+                
+            try:
+                match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
+                time_left = (match_time - now_utc).total_seconds() / 60.0
+                print(f"⏰ Осталось минут: {time_left:.1f}")
+            except Exception as e:
+                print(f"❌ ОШИБКА ПАРСИНГА ВРЕМЕНИ: {e}")
+            
+            print("-------------------------")
+            debug_count += 1
+
+        # Дальше идет обычная логика
+        if not home or not away or "(Games)" in home or "/" in home: continue
         if not start_ts: continue
         
         try:
@@ -85,12 +109,7 @@ def check_upcoming_matches():
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # ТЕСТОВОЕ ОКНО 24 ЧАСА (1440 минут)
-        if 0 < time_left <= 1440:
-            if match_id in sent_set:
-                print(f"⏭️ Пропущен (уже был): {home} - {away}")
-                continue
-                
+        if 0 < time_left <= 1440 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
