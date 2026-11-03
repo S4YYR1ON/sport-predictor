@@ -27,6 +27,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: 1
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          LIVETENNIS_API_KEY: ${{ secrets.LIVETENNIS_API_KEY }}
           PINNAPI_API_KEY: ${{ secrets.PINNAPI_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
