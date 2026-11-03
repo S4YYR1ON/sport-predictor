@@ -127,13 +127,36 @@ def check_upcoming_matches():
         print(f"❌ Ошибка API Pinnapi: {e}")
         return
 
+    debug_count = 0
     for ev in events_list:
         home = str(ev.get("home", "")).strip()
         away = str(ev.get("away", "")).strip()
+        
+        # Отладка: выводим название лиги и время для первых 5 матчей
+        if debug_count < 5:
+            print(f"--- МАТЧ: {home} - {away} ---")
+            print(f"🔑 Доступные ключи: {list(ev.keys())}")
+            
+            # Пытаемся найти лигу по разным ключам
+            lig = ev.get("league_name") or ev.get("league") or ev.get("tournament")
+            if isinstance(lig, dict):
+                lig = lig.get("name")
+            print(f"🏆 Лига: {lig}")
+            
+            # Пытаемся найти время по разным ключам
+            st = ev.get("start") or ev.get("starts") or ev.get("start_time")
+            print(f"⏰ Сырое время: {st}")
+            print("-------------------------")
+            debug_count += 1
+
+        # --- ДАЛЬШЕ ИДЕТ ОСТАЛЬНОЙ КОД ---
         if not home or not away or "(Games)" in home or "/" in home: continue
 
-        # --- ПРИМЕНЯЕМ ФИЛЬТР ТОП-ЛИГ ---
-        league_name = ev.get("league_name") or ev.get("league") or ""
+        # Пытаемся достать лигу для фильтра
+        league_name = ev.get("league_name") or ev.get("league") or ev.get("tournament")
+        if isinstance(league_name, dict):
+            league_name = league_name.get("name", "")
+            
         if not is_top_tournament(league_name):
             continue
 
