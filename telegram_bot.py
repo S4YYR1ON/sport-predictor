@@ -173,7 +173,7 @@ def check_upcoming_matches():
         # ----------------------------------------------------
 
         # ТЕСТОВОЕ ОКНО 60 МИНУТ (потом поменяем на 15)
-        if 0 < time_left <= 1440 and match_id not in sent_set:
+        if 0 < time_left <= 15 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
             ml = main.get("money_line", {})
