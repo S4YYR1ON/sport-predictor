@@ -136,7 +136,6 @@ def check_upcoming_matches():
         print(f"❌ Ошибка API Pinnapi: {e}")
         return
 
-    debug_count = 0
     for ev in events_list:
         home = str(ev.get("home", "")).strip()
         away = str(ev.get("away", "")).strip()
@@ -175,13 +174,7 @@ def check_upcoming_matches():
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # --- ОТЛАДКА (показываем первые 5 валидных матчей) ---
-        if debug_count < 5:
-            print(f"🔍 Матч: {home} - {away} | Лига: {league_name} | Через {time_left:.1f} мин")
-            debug_count += 1
-        # ----------------------------------------------------
-
-        # ТЕСТОВОЕ ОКНО 60 МИНУТ (потом поменяем на 15)
+        # ЖЕСТКОЕ ОКНО 15 МИНУТ
         if 0 < time_left <= 15 and match_id not in sent_set:
             periods = ev.get("periods", {})
             main = periods.get("num_0", {})
