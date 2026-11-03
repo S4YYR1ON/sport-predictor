@@ -47,83 +47,31 @@ def supabase_request(method, endpoint, data=None):
 # ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ О МАТЧАХ)
 # ==========================================
 def check_upcoming_matches():
-    print("=== НАЧАЛО ПРОВЕРКИ МАТЧЕЙ ===")
+    print("=== ЖЕСТКИЙ ТЕСТ ОТПРАВКИ ===")
     if not PINNAPI_KEY: return
-    now_utc = datetime.now(timezone.utc)
-    sent_set = set()
-    
-    if os.path.exists(SENT_FILE):
-        try:
-            with open(SENT_FILE, "r") as f: sent_set = set(json.load(f))
-        except: pass
 
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
         r = requests.get(url, headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
-        if r.status_code != 200: return
         events_list = r.json().get("events", [])
         print(f"📊 Получено событий: {len(events_list)}")
-    except: return
+    except Exception as e: 
+        print(f"Ошибка API: {e}")
+        return
 
-    for idx, ev in enumerate(events_list):
-        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
-        if not home or not away: continue
-
-        start_ts = ev.get("start")
-        if not start_ts: continue
+    if events_list:
+        ev = events_list[0] # Берем ПЕРВЫЙ попавшийся матч
+        home = str(ev.get("home", "")).strip()
+        away = str(ev.get("away", "")).strip()
+        
+        msg = f"🧪 <b>ТЕСТ!</b>\n🏆 <b>{home}</b> — <b>{away}</b>\n\nОтветь на это сообщение: <code>ТБ 2.7</code>"
         
         try:
-            match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-        except: continue
-
-        time_left = (match_time - now_utc).total_seconds() / 60.0
-        match_id = ev.get("event_id") or ev.get("id")
-
-        # --- ДИАГНОСТИКА: Выводим первые 5 матчей, чтобы понять, как считается время ---
-        if idx < 5:
-            print(f"DEBUG: {home} - {away} | Время API: {start_ts} | Осталось: {time_left:.1f} мин | Отправлен ранее: {match_id in sent_set}")
-
-        if 0 < time_left <= 1440 and match_id not in sent_set:
-            periods = ev.get("periods", {})
-            main = periods.get("num_0", {})
-            ml = main.get("money_line", {})
-            
-            if not ml or not ml.get("home"): continue
-            o_h, o_a = ml.get("home"), ml.get("away")
-            
-            msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
-            msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
-            msg += f"<b>Исход:</b> {o_h:.2f} / {o_a:.2f}\n"
-            
-            totals = main.get("totals", {})
-            if totals:
-                best_line = list(totals.keys())[0]
-                t_data = totals[best_line]
-                msg += f"<b>Тотал (сет):</b>\nТМ({best_line}): {t_data.get('under', 0):.2f} | ТБ({best_line}): {t_data.get('over', 0):.2f}\n"
-            
-            spreads = main.get("spreads", {})
-            if spreads:
-                best_line = list(spreads.keys())[0]
-                s_data = spreads[best_line]
-                msg += f"<b>Фора (сет):</b>\nФ1({s_data.get('hdp')}): {s_data.get('home', 0):.2f} | Ф2({-float(s_data.get('hdp'))}): {s_data.get('away', 0):.2f}\n"
-            
-            msg += f"\n👉 <i>Ответь на это сообщение, чтобы сохранить ставку!</i>"
-            
-            try:
-                # ФИКС GENERAL ТЕМЫ: если ID = 1, передаем None
-                t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-                
-                bot.send_message(
-                    GROUP_CHAT_ID, 
-                    msg, 
-                    parse_mode="HTML",
-                    message_thread_id=t_id
-                )
-                print(f"✅ ОТПРАВЛЕНО: {home} - {away}")
-                sent_set.add(match_id)
-                with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
-            except Exception as e:
-                print(f"❌ ОШИБКА ОТПРАВКИ: {e}")
+            t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
+            bot.send_message(GROUP_CHAT_ID, msg, parse_mode="HTML", message_thread_id=t_id)
+            print(f"✅ ТЕСТОВОЕ УВЕДОМЛЕНИЕ ОТПРАВЛЕНО ДЛЯ: {home} - {away}")
+        except Exception as e:
+            print(f"❌ ОШИБКА ОТПРАВКИ: {e}")
 
 def background_worker():
     while True:
