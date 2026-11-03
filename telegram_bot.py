@@ -25,6 +25,22 @@ THREAD_ID_STATS = int(os.getenv("THREAD_ID_STATS", 0))
 bot = telebot.TeleBot(TG_TOKEN)
 SENT_FILE = "sent_matches.json"
 
+def is_top_tournament(league_name):
+    """Проверяет, является ли турнир топовым (ATP/WTA), а не ITF/Challenger"""
+    if not league_name:
+        return False
+    name_lower = str(league_name).lower()
+    
+    # Исключаем низшие лиги
+    exclude = [
+        "itf", "challenger", "w15", "w25", "w35", "w50", "w75", "w100",
+        "m15", "m25", "wta 125", "atp 125", "125k", "doubles", "utr"
+    ]
+    if any(word in name_lower for word in exclude):
+        return False
+        
+    # Оставляем только ATP или WTA
+    return "atp" in name_lower or "wta" in name_lower
 # ==========================================
 # РАБОТА С SUPABASE
 # ==========================================
