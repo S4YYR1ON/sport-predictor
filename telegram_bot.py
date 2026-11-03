@@ -16,7 +16,6 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 
-# ID тем в Telegram
 THREAD_ID_NOTIFICATIONS = int(os.getenv("THREAD_ID_NOTIFICATIONS", 0))
 THREAD_ID_MY_BETS = int(os.getenv("THREAD_ID_MY_BETS", 0))
 THREAD_ID_STATS = int(os.getenv("THREAD_ID_STATS", 0))
@@ -43,6 +42,16 @@ def supabase_request(method, endpoint, data=None):
         r = requests.get(url, headers=headers)
     return r.json()
 
+def load_sent():
+    if os.path.exists(SENT_FILE):
+        try:
+            with open(SENT_FILE, "r") as f: return set(json.load(f))
+        except: return set()
+    return set()
+
+def save_sent(sent_set):
+    with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
+
 # ==========================================
 # ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ О МАТЧАХ)
 # ==========================================
@@ -50,12 +59,7 @@ def check_upcoming_matches():
     print("=== НАЧАЛО ПРОВЕРКИ МАТЧЕЙ ===")
     if not PINNAPI_KEY: return
     now_utc = datetime.now(timezone.utc)
-    sent_set = set()
-    
-    if os.path.exists(SENT_FILE):
-        try:
-            with open(SENT_FILE, "r") as f: sent_set = set(json.load(f))
-        except: pass
+    sent_set = load_sent()
 
     url = "https://pinnapi.com/kit/v1/prematch/fixtures"
     try:
@@ -63,34 +67,28 @@ def check_upcoming_matches():
         if r.status_code != 200: return
         events_list = r.json().get("events", [])
         print(f"📊 Получено событий: {len(events_list)}")
-    except: return
+    except Exception as e: 
+        print(f"❌ Ошибка API: {e}")
+        return
 
-       for ev in events_list:
-        home = str(ev.get("home", "")).strip()
-        away = str(ev.get("away", "")).strip()
-        
-        # 1. Проверка на пустые имена и парный разряд
-        if not home or not away:
-            continue
-        if "(Games)" in home or "(Games)" in away or "/" in home or "/" in away:
-            continue
+    for ev in events_list:
+        home, away = str(ev.get("home", "")).strip(), str(ev.get("away", "")).strip()
+        if not home or not away or "(Games)" in home or "/" in home: continue
 
         start_ts = ev.get("start")
-        if not start_ts: 
-            continue
+        if not start_ts: continue
         
         try:
             match_time = datetime.fromisoformat(start_ts.split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-        except: 
-            continue
+        except: continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # Проверяем условия и пишем, почему пропускаем
+        # ТЕСТОВОЕ ОКНО 24 ЧАСА (1440 минут)
         if 0 < time_left <= 1440:
             if match_id in sent_set:
-                print(f"⏭️ Пропущен (уже отправляли): {home} - {away}")
+                print(f"⏭️ Пропущен (уже был): {home} - {away}")
                 continue
                 
             periods = ev.get("periods", {})
@@ -98,10 +96,9 @@ def check_upcoming_matches():
             ml = main.get("money_line", {})
             
             if not ml or not ml.get("home"): 
-                print(f"⏭️ Пропущен (нет кэфов Pinnapi): {home} - {away}")
+                print(f"⏭️ Пропущен (нет кэфов): {home} - {away}")
                 continue
                 
-            # ЕСЛИ ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ - ОТПРАВЛЯЕМ
             o_h, o_a = ml.get("home"), ml.get("away")
             
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
@@ -127,16 +124,16 @@ def check_upcoming_matches():
                 bot.send_message(GROUP_CHAT_ID, msg, parse_mode="HTML", message_thread_id=t_id)
                 print(f"✅ ОТПРАВЛЕНО: {home} - {away}")
                 sent_set.add(match_id)
-                with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
+                save_sent(sent_set)
             except Exception as e:
                 print(f"❌ ОШИБКА ОТПРАВКИ: {e}")
 
 def background_worker():
     while True:
         now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
-        if 8 <= now_msk.hour < 24:
+        if 0 <= now_msk.hour < 24: # Круглосуточно для теста
             check_upcoming_matches()
-        time.sleep(600)
+        time.sleep(600) # Пауза 10 минут
 
 # ==========================================
 # ОБРАБОТКА ОТВЕТОВ (СОЗДАНИЕ СТАВКИ)
@@ -209,7 +206,6 @@ def handle_bet_reply(message):
                 types.InlineKeyboardButton("❌ Проиграл", callback_data=f"lose_{bet_id}"), 
                 types.InlineKeyboardButton("🔄 Возврат", callback_data=f"void_{bet_id}")
             )
-            # ФИКС GENERAL ТЕМЫ
             b_id = THREAD_ID_MY_BETS if THREAD_ID_MY_BETS > 1 else None
             bot.send_message(GROUP_CHAT_ID, card_text, reply_markup=markup, parse_mode="HTML", message_thread_id=b_id)
     
@@ -261,20 +257,14 @@ def show_stats(message):
 # ЗАПУСК
 # ==========================================
 if __name__ == "__main__":
-    # --- ТЕСТ ОТПРАВКИ ---
     try:
-        print("📤 Пытаюсь отправить тестовое сообщение в группу...")
+        print("📤 Пытаюсь отправить тестовое сообщение...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(
-            GROUP_CHAT_ID, 
-            "🛠️ <b>Тестовое сообщение от бота!</b>\nЕсли ты это видишь, значит группа и темы настроены верно.", 
-            parse_mode="HTML",
-            message_thread_id=t_id
-        )
-        print("✅ Тестовое сообщение успешно отправлено!")
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Тест!</b>", parse_mode="HTML", message_thread_id=t_id)
+        print("✅ Тест отправлен!")
     except Exception as e:
-        print(f"❌ ОШИБКА ОТПРАВКИ ТЕСТА: {e}")
+        print(f"❌ ОШИБКА ТЕСТА: {e}")
 
     threading.Thread(target=background_worker, daemon=True).start()
-    print("Бот запущен в режиме 24/7 (Long Polling)...")
+    print("Бот запущен...")
     bot.infinity_polling(timeout=30)
