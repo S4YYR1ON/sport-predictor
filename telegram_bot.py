@@ -222,20 +222,17 @@ def background_worker():
 # ==========================================
 @bot.message_handler(func=lambda message: message.reply_to_message is not None and str(message.chat.id) == str(GROUP_CHAT_ID))
 def handle_bet_reply(message):
-    # 1. Если это команда (начинается с /), игнорируем этот обработчик
-    if message.text.startswith('/'):
+    # Если это команда (начинается с /), игнорируем её, чтобы не сломать бота
+    if message.text and message.text.startswith('/'):
         return
-
+        
     original_msg = message.reply_to_message.text
-    
-    # 2. Если ответили не на уведомление о матче, тоже игнорируем
     if not original_msg or "Матч через" not in original_msg:
         return
-
+        
     user_text = message.text.upper().replace(",", " ").replace(".", ",").split()
     
     try:
-        # ... (дальше идет твой код парсинга кэфов) ...
         ml_str = original_msg.split("Исход:")[1].split("\n")[0].strip()
         pin_ml = [float(x.strip()) for x in ml_str.split("/")]
         tot_str = original_msg.split("ТМ(")[1].split("\n")[0]
@@ -279,7 +276,7 @@ def handle_bet_reply(message):
     for market, u_odd, p_odd, clv in bets_to_save:
         data = {
             "chat_id": message.chat.id, 
-            "user_id": message.from_user.id,
+            "user_id": message.from_user.id, # СОХРАНЯЕМ ТВОЙ ID
             "username": message.from_user.username or message.from_user.first_name,
             "match_name": match_name, 
             "market": market, 
