@@ -323,21 +323,27 @@ def handle_callback(call):
 def show_stats(message):
     try:
         user_id = message.from_user.id
-        print(f"📊 Запрос статистики от {user_id}")
         
-        # Делаем запрос к Supabase
+        # Ищем в базе ТОЛЬКО твои ставки (по твоему user_id)
         res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
         
-        # Если Supabase вернул ошибку (например, нет колонки user_id)
-        if isinstance(res, dict) and ("message" in res or "error" in res):
-            bot.reply_to(message, f"❌ Ошибка БД: {res.get('message', res)}")
+        # Если база вернула ошибку
+        if isinstance(res, dict) and "message" in res:
+            bot.reply_to(message, f"❌ Ошибка БД: {res['message']}")
             return
             
+        # Если ставок нет
         if not res or len(res) == 0:
             s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
-            bot.send_message(GROUP_CHAT_ID, f"📊 {message.from_user.first_name}, у тебя пока нет закрытых ставок.", message_thread_id=s_id)
+            bot.send_message(
+                GROUP_CHAT_ID, 
+                f"📊 <b>{message.from_user.first_name}</b>, у тебя пока нет закрытых ставок.", 
+                parse_mode="HTML",
+                message_thread_id=s_id
+            )
             return
             
+        # Считаем статистику
         total = len(res)
         won = sum(1 for r in res if r["status"] == "won")
         lost = sum(1 for r in res if r["status"] == "lost")
