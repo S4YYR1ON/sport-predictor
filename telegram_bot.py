@@ -319,8 +319,14 @@ def handle_callback(call):
 # ==========================================
 # СТАТИСТИКА
 # ==========================================
+@bot.message_handler(commands=['test']) #тест команд
+def test_cmd(message):
+    bot.reply_to(message, "✅ Я работаю и слышу тебя!")
+
+
 @bot.message_handler(commands=['stats'])
 def show_stats(message):
+    print(f"📊 ПРИШЛА КОМАНДА /stats ОТ {message.from_user.first_name}")
     try:
         user_id = message.from_user.id
         
