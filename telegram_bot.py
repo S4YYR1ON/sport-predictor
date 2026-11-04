@@ -370,13 +370,25 @@ def show_stats(message):
 # ЗАПУСК
 # ==========================================
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
     try:
         print("📤 Отправляю тест...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот запущен!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с обновлением!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
+    # УДАЛЯЕМ ВЕБХУК (чтобы он не блокировал чтение команд)
+    try:
+        bot.remove_webhook()
+        print("✅ Вебхук удален. Теперь Polling будет работать.")
+    except Exception as e:
+        print(f"❌ Ошибка при удалении вебхука: {e}")
+
     threading.Thread(target=background_worker, daemon=True).start()
-    print("Бот запущен в режиме 24/7...")
+    print("Бот запущен в режиме 24/7 (Polling)...")
+    
+    # Запускаем чтение команд
     bot.infinity_polling(timeout=30)
