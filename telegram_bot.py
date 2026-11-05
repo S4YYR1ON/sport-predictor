@@ -376,52 +376,50 @@ def echo_all(message):
 
 if __name__ == "__main__":
     import logging
-    # Включаем максимальный уровень логирования для Telebot
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     print("📤 Отправляю тест...")
     try:
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен в режиме ЯДЕРНОЙ ОТЛАДКИ!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с ПРЯМЫМ вызовом команд!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
-    # Проверяем, с каким ботом мы вообще соединяемся
-    try:
-        me = bot.get_me()
-        print(f"✅ Успешно подключились к Telegram как @{me.username}")
-    except Exception as e:
-        print(f"❌ ОШИБКА ПОДКЛЮЧЕНИЯ К TELEGRAM: {e}")
-
-    # Удаляем вебхук
     try:
         bot.remove_webhook()
-        print("✅ Вебхук удален.")
-    except Exception as e:
-        print(f"❌ Ошибка вебхука: {e}")
+    except: pass
 
-    # Запускаем фоновые матчи
     threading.Thread(target=background_worker, daemon=True).start()
     
-    print("🔄 Запускаю РУЧНОЙ цикл получения сообщений...")
+    print("🔄 Запускаю РУЧНОЙ цикл...")
     
-    # РУЧНОЙ ЦИКЛ (вместо infinity_polling)
     last_update_id = None
     while True:
         try:
-            # Явно запрашиваем сообщения у Telegram
             updates = bot.get_updates(offset=last_update_id, timeout=20, limit=10)
             
             if updates:
                 for update in updates:
                     last_update_id = update.update_id + 1
-                    print(f"🚨 ПОЛУЧЕНО ОБНОВЛЕНИЕ ОТ TELEGRAM: {update}")
-                    # Передаем сообщение обработчикам (твоим функциям)
-                    bot.process_new_updates([update])
-            else:
-                # Если сообщений нет, просто идем на новый круг
-                pass
-                
+                    
+                    if update.message:
+                        msg = update.message
+                        print(f"🚨 ПОЛУЧЕНО СООБЩЕНИЕ: {msg.text}")
+                        
+                        # Прямой вызов обработчиков
+                        try:
+                            if msg.text == '/test':
+                                bot.reply_to(msg, "✅ Бот работает! Это прямой ответ.")
+                            elif msg.text == '/stats':
+                                print("-> Вызываю show_stats...")
+                                show_stats(msg)
+                            elif msg.reply_to_message:
+                                print("-> Вызываю handle_bet_reply...")
+                                handle_bet_reply(msg)
+                        except Exception as e:
+                            print(f"❌ ОШИБКА ПРИ ВЫЗОВЕ ФУНКЦИИ: {e}")
+                            bot.reply_to(msg, f"❌ Ошибка в коде: {e}")
+                            
         except Exception as e:
-            print(f"❌ ОШИБКА В ЦИКЛЕ ПОЛУЧЕНИЯ: {e}")
+            print(f"❌ ОШИБКА В ЦИКЛЕ: {e}")
             time.sleep(5)
