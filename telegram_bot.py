@@ -369,26 +369,34 @@ def show_stats(message):
 # ==========================================
 # ЗАПУСК
 # ==========================================
-if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    print(f"🚨 ПОЙМАНО СООБЩЕНИЕ: {message.text} | Chat ID: {message.chat.id} | Thread: {message.message_thread_id}")
 
+
+if __name__ == "__main__":
+    print("📤 Отправляю тест...")
     try:
-        print("📤 Отправляю тест...")
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с обновлением!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с жесткой отладкой!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
-    # УДАЛЯЕМ ВЕБХУК (чтобы он не блокировал чтение команд)
+    # Удаляем вебхук
     try:
         bot.remove_webhook()
-        print("✅ Вебхук удален. Теперь Polling будет работать.")
+        print("✅ Вебхук удален.")
     except Exception as e:
-        print(f"❌ Ошибка при удалении вебхука: {e}")
+        print(f"❌ Ошибка вебхука: {e}")
 
+    # Запускаем фоновые матчи
     threading.Thread(target=background_worker, daemon=True).start()
-    print("Бот запущен в режиме 24/7 (Polling)...")
     
-    # Запускаем чтение команд
-    bot.infinity_polling(timeout=30)
+    # БЕСКОНЕЧНЫЙ ЦИКЛ: Если бот падает, он перезапустится и напишет ОШИБКУ в лог
+    while True:
+        try:
+            print("🔄 Запускаю главный поток (infinity_polling)...")
+            bot.infinity_polling(timeout=30, skip_pending=True)
+        except Exception as e:
+            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА POLLING: {e}")
+            time.sleep(5) # Ждем 5 секунд и перезапускаем
