@@ -97,21 +97,28 @@ def setup_group(message):
 
     # 1. Меняем название группы
     try:
-        new_title = f"SportPredictorGroup | {message.from_user.first_name}"
+        new_title = f"SportPredictorGroup"
         bot.set_chat_title(chat_id, new_title)
     except Exception as e:
         print(f"Не смог изменить название: {e}")
 
-    # 2. Ставим аватарку группе (нужна прямая ссылка на картинку .jpg/.png)
+    # 2. Ставим аватарку группе
     try:
-        image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg" 
-        img_data = requests.get(image_url).content
-        bot.set_chat_photo(chat_id, photo=img_data)
+        image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg"
+            
+        # Притворяемся браузером, чтобы сайт не блокировал скачивание
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        img_data = requests.get(image_url, headers=headers, timeout=10).content
+            
+        # Проверяем, что скачалось хоть что-то (а не пустая страница с ошибкой)
+        if len(img_data) > 1000:
+            bot.set_chat_photo(chat_id, photo=img_data)
+            print("✅ Аватарка успешно изменена!")
+        else:
+            print("❌ Ошибка: Скачанный файл слишком маленький (возможно, сайт заблокировал).")
+                
     except Exception as e:
-        print(f"Не смог изменить аватарку: {e}")
-
-    # ... сохранение в базу ...
-
+        print(f"❌ Не смог изменить аватарку: {e}")
 # ==========================================
 # УВЕДОМЛЕНИЯ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
 # ==========================================
