@@ -150,7 +150,7 @@ def check_upcoming_matches():
         except Exception as e:
             print(f"LiveTennis error: {e}")
 
-    # Получаем кэфы
+    # Получаем кэфы из Pinnapi
     try:
         r = requests.get("https://pinnapi.com/kit/v1/prematch/fixtures", headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
         if r.status_code != 200: return
@@ -170,9 +170,12 @@ def check_upcoming_matches():
         if any(x in league_name.lower() for x in ["itf", "challenger", "m15", "w15", "w25", "w35", "w50", "w75", "w100"]): continue
 
         match_time = None
-        h_last = home.lower().split()[-1]
-        a_last = away.lower().split()[-1]
-        match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
+        h_parts = home.lower().split()
+        a_parts = away.lower().split()
+        if h_parts and a_parts:
+            h_last = h_parts[-1]
+            a_last = a_parts[-1]
+            match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
 
         if not match_time:
             start_ts = ev.get("start") or ev.get("starts")
@@ -186,12 +189,32 @@ def check_upcoming_matches():
         match_id = ev.get("event_id") or ev.get("id")
 
         if 0 < time_left <= 15 and match_id not in sent_set:
-            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
+            periods = ev.get("periods", {})
+            main = periods.get("num_0", {})
+            ml = main.get("money_line", {})
+            
             if not ml or not ml.get("home"): continue
             
+            # Формируем сообщение
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
             msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
             msg += f"<b>Исход:</b> {ml.get('home'):.2f} / {ml.get('away'):.2f}\n"
+            
+            # Добавляем Тотал
+            totals = main.get("totals", {})
+            if totals:
+                best_line = list(totals.keys())[0]
+                t_data = totals[best_line]
+                msg += f"<b>Тотал (сет):</b>\nТМ({best_line}): {t_data.get('under', 0):.2f} | ТБ({best_line}): {t_data.get('over', 0):.2f}\n"
+            
+            # Добавляем Фору
+            spreads = main.get("spreads", {})
+            if spreads:
+                best_line = list(spreads.keys())[0]
+                s_data = spreads[best_line]
+                msg += f"<b>Фора (сет):</b>\nФ1({s_data.get('hdp')}): {s_data.get('home', 0):.2f} | Ф2({-float(s_data.get('hdp'))}): {s_data.get('away', 0):.2f}\n"
+            
+            msg += f"\n👉 <i>Ответь на это сообщение, чтобы сохранить ставку!</i>"
             
             # Отправляем КАЖДОМУ пользователю в его группу
             for user in users:
