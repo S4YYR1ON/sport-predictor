@@ -313,10 +313,24 @@ def show_stats(message):
         total = len(res)
         won = sum(1 for r in res if r["status"] == "won")
         lost = sum(1 for r in res if r["status"] == "lost")
+        void = sum(1 for r in res if r["status"] == "void") # <--- Считаем возвраты
+        
+        # Профит считается только по победам и поражениям
         profit = won - lost
+        
+        # Средний CLV считаем по всем закрытым ставкам (включая возвраты)
         avg_clv = sum(r["clv"] for r in res) / total
         
-        text = f"📊 <b>Твоя статистика</b>\n\n<pre>Всего: {total}\n✅ Побед: {won}\n❌ Поражений: {lost}\n📈 CLV: {avg_clv:+.2%}\n💰 Профит: {profit:+.1f}</pre>"
+        # Формируем сообщение с добавленной строкой возвратов
+        text = f"📊 <b>Твоя статистика</b>\n\n<pre>"
+        text += f"Всего:       {total}\n"
+        text += f"✅ Побед:     {won}\n"
+        text += f"❌ Поражений: {lost}\n"
+        text += f"🔄 Возвратов: {void}\n"
+        text += f"------------------------\n"
+        text += f"📈 CLV:      {avg_clv:+.2%}\n"
+        text += f"💰 Профит:   {profit:+.1f}</pre>"
+        
         bot.send_message(message.chat.id, text, parse_mode="HTML", message_thread_id=t_stats)
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
