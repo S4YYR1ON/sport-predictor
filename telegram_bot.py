@@ -67,7 +67,7 @@ def setup_group(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
-    bot.reply_to(message, "⏳ Настраиваю группу (темы, название, аватарка). Это займет около 10 секунд...")
+    bot.reply_to(message, "⏳ Настраиваю группу (темы, название, аватарка). Это займет около 8 секунд...")
 
     try:
         # 1. Создаем темы
@@ -82,21 +82,14 @@ def setup_group(message):
         topic_stats = bot.create_forum_topic(chat_id, "📊 Статистика")
         t_stats = topic_stats.message_thread_id
 
-        # 2. Включаем уведомления для тем
-        for t_id in [t_notif, t_bets, t_stats]:
-            try:
-                bot.set_forum_topic_notification_settings(chat_id, t_id, notification_settings={})
-            except Exception as e:
-                print(f"⚠️ Ошибка включения уведомлений для темы {t_id}: {e}")
-
-        # 3. Меняем название группы
+        # 2. Меняем название группы
         try:
             new_title = f"SportPredictorGroup"
             bot.set_chat_title(chat_id, new_title)
         except Exception as e:
             print(f"⚠️ Не смог изменить название: {e}")
 
-        # 4. Ставим аватарку (используем ссылку, которую ты присылал)
+        # 3. Ставим аватарку
         try:
             image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -108,9 +101,9 @@ def setup_group(message):
             else:
                 print("❌ Ошибка: Скачанный файл слишком маленький.")
         except Exception as e:
-            print(f"⚠️ Не смог изменить аватарку: {e}")
+            print(f"⚠️ НЕ СМОГ ИЗМЕНИТЬ АВАТАРКУ: {e}")
 
-        # 5. Сохраняем в базу
+        # 4. Сохраняем в базу
         supabase_request("DELETE", f"user_settings?user_id=eq.{user_id}")
         data = {
             "user_id": user_id,
@@ -123,7 +116,7 @@ def setup_group(message):
         
         bot.send_message(
             chat_id, 
-            "✅ <b>Группа успешно настроена!</b>\nВсе темы созданы, уведомления включены, профиль обновлен.", 
+            "✅ <b>Группа успешно настроена!</b>\nТемы созданы, профиль обновлен.", 
             parse_mode="HTML", 
             message_thread_id=t_notif
         )
