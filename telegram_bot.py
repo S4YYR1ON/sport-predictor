@@ -256,40 +256,61 @@ def handle_bet_reply(message):
         
     user_text = message.text.upper().replace(",", " ").replace(".", ",").split()
     
+    # 1. Достаем ВСЕ кэфы Pinnacle из оригинального сообщения
     try:
         ml_str = original_msg.split("Исход:")[1].split("\n")[0].strip()
         pin_ml = [float(x.strip()) for x in ml_str.split("/")]
-    except:
-        bot.reply_to(message, "❌ Не смог прочитать кэфы Pinnacle из сообщения.")
+        
+        tot_str = original_msg.split("ТМ(")[1].split("\n")[0]
+        pin_tm = float(tot_str.split("): ")[1].split(" |")[0])
+        pin_tb = float(tot_str.split("ТБ(")[1].split("): ")[1])
+        
+        sp_str = original_msg.split("Ф1(")[1].split("\n")[0]
+        pin_f1 = float(sp_str.split("): ")[1].split(" |")[0])
+        pin_f2 = float(sp_str.split("Ф2(")[1].split("): ")[1])
+    except Exception as e:
+        bot.reply_to(message, f"❌ Не смог прочитать кэфы Pinnacle из сообщения.\nОшибка: {e}")
         return
 
+    # 2. Парсим то, что написал ты (ТБ, ТМ, П1, П2, Ф1, Ф2)
     bets_to_save = []
     i = 0
     while i < len(user_text):
         market = user_text[i]
-        if market in ["П1", "П2"] and i + 1 < len(user_text):
+        if market in ["ТБ", "ТМ", "П1", "П2", "Ф1", "Ф2"] and i + 1 < len(user_text):
             try:
                 user_odd = float(user_text[i+1].replace(",", "."))
-                pin_odd = pin_ml[0] if market == "П1" else pin_ml[1]
-                clv = (user_odd / pin_odd) - 1
-                bets_to_save.append((market, user_odd, pin_odd, clv))
+                pin_odd = None
+                
+                if market == "ТБ": pin_odd = pin_tb
+                elif market == "ТМ": pin_odd = pin_tm
+                elif market == "П1": pin_odd = pin_ml[0]
+                elif market == "П2": pin_odd = pin_ml[1]
+                elif market == "Ф1": pin_odd = pin_f1
+                elif market == "Ф2": pin_odd = pin_f2
+                
+                if pin_odd:
+                    clv = (user_odd / pin_odd) - 1
+                    bets_to_save.append((market, user_odd, pin_odd, clv))
             except: pass
             i += 2
-        else: i += 1
+        else: 
+            i += 1
 
     if not bets_to_save:
-        bot.reply_to(message, "❌ Не распознал ставки. Пиши строго: П1 1.85 или П2 2.10")
+        bot.reply_to(message, "❌ Не распознал ставки. Пиши строго: ТБ 2.7, Ф1 2.5, П1 1.85")
         return
 
     match_name = original_msg.split("\n")[1].replace("<b>", "").replace("</b>", "")
     
-    # Узнаем, в какую тему отправлять карточку
+    # 3. Находим тему "Мои ставки" для этого пользователя
     settings = supabase_request("GET", f"user_settings?user_id=eq.{message.from_user.id}", None)
     if not settings or isinstance(settings, dict):
         bot.reply_to(message, "❌ Сначала настрой группу командой /setup")
         return
     t_bets = settings[0]["thread_bets"]
 
+    # 4. Сохраняем и отправляем карточки
     for market, u_odd, p_odd, clv in bets_to_save:
         data = {
             "chat_id": message.chat.id, 
@@ -315,7 +336,6 @@ def handle_bet_reply(message):
             bot.send_message(message.chat.id, card_text, reply_markup=markup, parse_mode="HTML", message_thread_id=t_bets)
     
     bot.reply_to(message, "✅ Ставки сохранены!")
-
 # ==========================================
 # КНОПКИ И СТАТИСТИКА
 # ==========================================
