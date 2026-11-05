@@ -56,7 +56,6 @@ def setup_group(message):
         bot.reply_to(message, "❌ Эту команду нужно вызывать в группе!")
         return
 
-    # Проверяем, админ ли пользователь
     try:
         member = bot.get_chat_member(message.chat.id, message.from_user.id)
         if member.status not in ['creator', 'administrator']:
@@ -68,15 +67,19 @@ def setup_group(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
-    bot.reply_to(message, "⏳ Настраиваю группу и создаю темы...")
+    bot.reply_to(message, "⏳ Настраиваю группу. Это займет 5 секунд (создаю темы)...")
 
     try:
-        # Создаем темы
+        # Создаем темы с паузами, чтобы Telegram не выдавал ошибку
         t_notif = bot.create_forum_topic(chat_id, "🔔 Уведомления").message_thread_id
+        time.sleep(2) # Пауза 2 секунды
+        
         t_bets = bot.create_forum_topic(chat_id, "📝 Мои ставки").message_thread_id
+        time.sleep(2) # Пауза 2 секунды
+        
         t_stats = bot.create_forum_topic(chat_id, "📊 Статистика").message_thread_id
 
-        # Сохраняем в базу (если уже есть - обновляем)
+        # Сохраняем в базу
         supabase_request("DELETE", f"user_settings?user_id=eq.{user_id}")
         data = {
             "user_id": user_id,
@@ -87,9 +90,9 @@ def setup_group(message):
         }
         supabase_request("POST", "user_settings", data)
         
-        bot.send_message(chat_id, "✅ <b>Группа успешно настроена!</b>\nТеперь сюда будут приходить уведомления и статистика.", parse_mode="HTML", message_thread_id=t_notif)
+        bot.send_message(chat_id, "✅ <b>Группа успешно настроена!</b>\nВсе темы созданы.", parse_mode="HTML", message_thread_id=t_notif)
     except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка при создании тем. Убедись, что в группе включены 'Темы' (Topics) и бот является админом.\nОшибка: {e}")
+        bot.reply_to(message, f"❌ Ошибка: {e}")
 
 # ==========================================
 # УВЕДОМЛЕНИЯ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
