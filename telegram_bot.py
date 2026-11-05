@@ -381,7 +381,7 @@ if __name__ == "__main__":
     print("📤 Отправляю тест...")
     try:
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с ПРЯМЫМ вызовом команд!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен и полностью готов к работе!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
 
@@ -402,23 +402,32 @@ if __name__ == "__main__":
                 for update in updates:
                     last_update_id = update.update_id + 1
                     
+                    # 1. ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
                     if update.message:
                         msg = update.message
-                        print(f"🚨 ПОЛУЧЕНО СООБЩЕНИЕ: {msg.text}")
+                        print(f"🚨 СООБЩЕНИЕ: {msg.text}")
                         
-                        # Прямой вызов обработчиков
                         try:
                             if msg.text == '/test':
-                                bot.reply_to(msg, "✅ Бот работает! Это прямой ответ.")
+                                bot.reply_to(msg, "✅ Бот работает!")
                             elif msg.text == '/stats':
-                                print("-> Вызываю show_stats...")
                                 show_stats(msg)
                             elif msg.reply_to_message:
-                                print("-> Вызываю handle_bet_reply...")
                                 handle_bet_reply(msg)
                         except Exception as e:
-                            print(f"❌ ОШИБКА ПРИ ВЫЗОВЕ ФУНКЦИИ: {e}")
+                            print(f"❌ ОШИБКА ФУНКЦИИ: {e}")
                             bot.reply_to(msg, f"❌ Ошибка в коде: {e}")
+                            
+                    # 2. ОБРАБОТКА НАЖАТИЙ НА КНОПКИ (Выиграл/Проиграл)
+                    elif update.callback_query:
+                        call = update.callback_query
+                        print(f"🚨 НАЖАТА КНОПКА: {call.data}")
+                        
+                        try:
+                            handle_callback(call) # Вызываем функцию из твоего кода
+                        except Exception as e:
+                            print(f"❌ ОШИБКА КНОПКИ: {e}")
+                            bot.answer_callback_query(call.id, f"Ошибка: {e}")
                             
         except Exception as e:
             print(f"❌ ОШИБКА В ЦИКЛЕ: {e}")
