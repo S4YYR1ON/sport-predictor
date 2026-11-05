@@ -375,12 +375,23 @@ def echo_all(message):
 
 
 if __name__ == "__main__":
+    import logging
+    # Включаем максимальный уровень логирования для Telebot
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
     print("📤 Отправляю тест...")
     try:
         t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен с жесткой отладкой!</b>", parse_mode="HTML", message_thread_id=t_id)
+        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен в режиме ЯДЕРНОЙ ОТЛАДКИ!</b>", parse_mode="HTML", message_thread_id=t_id)
     except Exception as e:
         print(f"❌ ОШИБКА ТЕСТА: {e}")
+
+    # Проверяем, с каким ботом мы вообще соединяемся
+    try:
+        me = bot.get_me()
+        print(f"✅ Успешно подключились к Telegram как @{me.username}")
+    except Exception as e:
+        print(f"❌ ОШИБКА ПОДКЛЮЧЕНИЯ К TELEGRAM: {e}")
 
     # Удаляем вебхук
     try:
@@ -392,11 +403,25 @@ if __name__ == "__main__":
     # Запускаем фоновые матчи
     threading.Thread(target=background_worker, daemon=True).start()
     
-    # БЕСКОНЕЧНЫЙ ЦИКЛ: Если бот падает, он перезапустится и напишет ОШИБКУ в лог
+    print("🔄 Запускаю РУЧНОЙ цикл получения сообщений...")
+    
+    # РУЧНОЙ ЦИКЛ (вместо infinity_polling)
+    last_update_id = None
     while True:
         try:
-            print("🔄 Запускаю главный поток (infinity_polling)...")
-            bot.infinity_polling(timeout=30, skip_pending=True)
+            # Явно запрашиваем сообщения у Telegram
+            updates = bot.get_updates(offset=last_update_id, timeout=20, limit=10)
+            
+            if updates:
+                for update in updates:
+                    last_update_id = update.update_id + 1
+                    print(f"🚨 ПОЛУЧЕНО ОБНОВЛЕНИЕ ОТ TELEGRAM: {update}")
+                    # Передаем сообщение обработчикам (твоим функциям)
+                    bot.process_new_updates([update])
+            else:
+                # Если сообщений нет, просто идем на новый круг
+                pass
+                
         except Exception as e:
-            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА POLLING: {e}")
-            time.sleep(5) # Ждем 5 секунд и перезапускаем
+            print(f"❌ ОШИБКА В ЦИКЛЕ ПОЛУЧЕНИЯ: {e}")
+            time.sleep(5)
