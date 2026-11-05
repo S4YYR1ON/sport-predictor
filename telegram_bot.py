@@ -16,37 +16,12 @@ PINNAPI_KEY = os.getenv("PINNAPI_API_KEY")
 LIVETENNIS_KEY = os.getenv("LIVETENNIS_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
-
-THREAD_ID_NOTIFICATIONS = int(os.getenv("THREAD_ID_NOTIFICATIONS", 0))
-THREAD_ID_MY_BETS = int(os.getenv("THREAD_ID_MY_BETS", 0))
-THREAD_ID_STATS = int(os.getenv("THREAD_ID_STATS", 0))
 
 bot = telebot.TeleBot(TG_TOKEN)
 SENT_FILE = "sent_matches.json"
 
 # ==========================================
-# ФИЛЬТР ТОПОВЫХ ЛИГ
-# ==========================================
-def is_top_tournament(league_name):
-    """Проверяет, является ли турнир топовым (ATP/WTA), а не ITF/Challenger"""
-    if not league_name:
-        return False
-    name_lower = str(league_name).lower()
-    
-    # Исключаем низшие лиги
-    exclude = [
-        "itf", "challenger", "w15", "w25", "w35", "w50", "w75", "w100",
-        "m15", "m25", "wta 125", "atp 125", "125k", "utr", "doubles"
-    ]
-    if any(word in name_lower for word in exclude):
-        return False
-        
-    # Оставляем только ATP или WTA
-    return "atp" in name_lower or "wta" in name_lower
-
-# ==========================================
-# РАБОТА С SUPABASE
+# SUPABASE
 # ==========================================
 def supabase_request(method, endpoint, data=None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
@@ -56,12 +31,10 @@ def supabase_request(method, endpoint, data=None):
         "Content-Type": "application/json", 
         "Prefer": "return=representation"
     }
-    if method == "POST": 
-        r = requests.post(url, headers=headers, json=data)
-    elif method == "PATCH": 
-        r = requests.patch(url, headers=headers, json=data)
-    else: 
-        r = requests.get(url, headers=headers)
+    if method == "POST": r = requests.post(url, headers=headers, json=data)
+    elif method == "PATCH": r = requests.patch(url, headers=headers, json=data)
+    elif method == "DELETE": r = requests.delete(url, headers=headers)
+    else: r = requests.get(url, headers=headers)
     return r.json()
 
 def load_sent():
@@ -75,157 +48,153 @@ def save_sent(sent_set):
     with open(SENT_FILE, "w") as f: json.dump(list(sent_set), f)
 
 # ==========================================
-# ВРЕМЯ ИЗ LIVE TENNIS API
+# КОМАНДА /setup ДЛЯ НАСТРОЙКИ ГРУППЫ
 # ==========================================
-def get_livetennis_times():
-    times = {}
-    if not LIVETENNIS_KEY: 
-        print("❌ ОШИБКА: LIVETENNIS_KEY не задан в секретах!")
-        return times
+@bot.message_handler(commands=['setup'])
+def setup_group(message):
+    if message.chat.type not in ['group', 'supergroup']:
+        bot.reply_to(message, "❌ Эту команду нужно вызывать в группе!")
+        return
+
+    # Проверяем, админ ли пользователь
     try:
-        print("📡 Запрашиваю Live Tennis API...")
-        with LiveTennisAPI(api_key=LIVETENNIS_KEY) as client:
-            fixtures = client.list_fixtures(limit=200)
-            print(f"📡 Live Tennis вернул матчей: {len(fixtures)}")
-            
-            for idx, match in enumerate(fixtures):
-                tour = str(getattr(match, 'tour', '')).lower()
-                if tour not in ['atp', 'wta']: continue
-                
-                p1 = str(getattr(match, 'player1_name', '')).lower().strip()
-                p2 = str(getattr(match, 'player2_name', '')).lower().strip()
-                
-                # Диагностика первого попавшегося матча
-                if idx == 0:
-                    print(f"🔍 Пример из Live Tennis: {p1} vs {p2} | Время: {getattr(match, 'start_time', None)}")
-                
-                p1_last = p1.split()[-1] if p1 else ""
-                p2_last = p2.split()[-1] if p2 else ""
-                if not p1_last or not p2_last: continue
-                
-                start_time_raw = getattr(match, 'start_time', None)
-                if start_time_raw:
-                    clean_time = str(start_time_raw).replace("Z", "+00:00")
-                    dt_utc = datetime.fromisoformat(clean_time)
-                    if dt_utc.tzinfo is None:
-                        dt_utc = dt_utc.replace(tzinfo=timezone.utc)
-                    times[f"{p1_last}_{p2_last}"] = dt_utc
+        member = bot.get_chat_member(message.chat.id, message.from_user.id)
+        if member.status not in ['creator', 'administrator']:
+            bot.reply_to(message, "❌ Только создатель или админ группы может настроить бота.")
+            return
+    except:
+        pass
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    
+    bot.reply_to(message, "⏳ Настраиваю группу и создаю темы...")
+
+    try:
+        # Создаем темы
+        t_notif = bot.create_forum_topic(chat_id, "🔔 Уведомления").message_thread_id
+        t_bets = bot.create_forum_topic(chat_id, "📝 Мои ставки").message_thread_id
+        t_stats = bot.create_forum_topic(chat_id, "📊 Статистика").message_thread_id
+
+        # Сохраняем в базу (если уже есть - обновляем)
+        supabase_request("DELETE", f"user_settings?user_id=eq.{user_id}")
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "thread_notif": t_notif,
+            "thread_bets": t_bets,
+            "thread_stats": t_stats
+        }
+        supabase_request("POST", "user_settings", data)
+        
+        bot.send_message(chat_id, "✅ <b>Группа успешно настроена!</b>\nТеперь сюда будут приходить уведомления и статистика.", parse_mode="HTML", message_thread_id=t_notif)
     except Exception as e:
-        print(f"❌ Ошибка LiveTennis: {e}")
-    return times
+        bot.reply_to(message, f"❌ Ошибка при создании тем. Убедись, что в группе включены 'Темы' (Topics) и бот является админом.\nОшибка: {e}")
 
 # ==========================================
-# ФОНОВЫЙ ПОТОК (УВЕДОМЛЕНИЯ)
+# УВЕДОМЛЕНИЯ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
 # ==========================================
 def check_upcoming_matches():
-    print("=== НАЧАЛО ПРОВЕРКИ МАТЧЕЙ ===")
+    print("=== ПРОВЕРКА МАТЧЕЙ ===")
     if not PINNAPI_KEY: return
+    
+    # Получаем список всех настроенных групп
+    users = supabase_request("GET", "user_settings", None)
+    if not users or isinstance(users, dict):
+        print("Нет настроенных пользователей.")
+        return
+
     now_utc = datetime.now(timezone.utc)
     sent_set = load_sent()
     
-    lt_times = get_livetennis_times()
-    print(f"🕒 Временных меток от Live Tennis: {len(lt_times)}")
+    # Получаем время из Live Tennis
+    lt_times = {}
+    if LIVETENNIS_KEY:
+        try:
+            with LiveTennisAPI(api_key=LIVETENNIS_KEY) as client:
+                fixtures = client.list_fixtures(limit=200)
+                for match in fixtures:
+                    tour = str(getattr(match, 'tour', '')).lower()
+                    if tour not in ['atp', 'wta']: continue
+                    p1 = str(getattr(match, 'player1_name', '')).lower().strip()
+                    p2 = str(getattr(match, 'player2_name', '')).lower().strip()
+                    p1_last = p1.split()[-1] if p1 else ""
+                    p2_last = p2.split()[-1] if p2 else ""
+                    st = getattr(match, 'start_time', None)
+                    if st and p1_last and p2_last:
+                        clean_time = str(st).replace("Z", "+00:00")
+                        dt = datetime.fromisoformat(clean_time)
+                        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+                        lt_times[f"{p1_last}_{p2_last}"] = dt
+        except Exception as e:
+            print(f"LiveTennis error: {e}")
 
-    url = "https://pinnapi.com/kit/v1/prematch/fixtures"
+    # Получаем кэфы
     try:
-        r = requests.get(url, headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
+        r = requests.get("https://pinnapi.com/kit/v1/prematch/fixtures", headers={"x-portal-apikey": PINNAPI_KEY}, params={"sport_id": 2}, timeout=15)
         if r.status_code != 200: return
         events_list = r.json().get("events", [])
-        print(f"📊 Получено событий от Pinnapi: {len(events_list)}")
-    except Exception as e: 
-        print(f"❌ Ошибка API Pinnapi: {e}")
-        return
+    except: return
 
     for ev in events_list:
         home = str(ev.get("home", "")).strip()
         away = str(ev.get("away", "")).strip()
         if not home or not away or "(Games)" in home or "/" in home: continue
 
-        # 1. Фильтр топ-лиг
-        league_name = ev.get("league_name") or ev.get("league") or ev.get("tournament")
-        if isinstance(league_name, dict):
-            league_name = league_name.get("name", "")
-            
-        if not is_top_tournament(league_name):
-            continue
+        league_name = ev.get("league_name") or ev.get("league") or ""
+        if isinstance(league_name, dict): league_name = league_name.get("name", "")
+        
+        # Только ATP/WTA
+        if not ("atp" in league_name.lower() or "wta" in league_name.lower()): continue
+        if any(x in league_name.lower() for x in ["itf", "challenger", "m15", "w15", "w25", "w35", "w50", "w75", "w100"]): continue
 
         match_time = None
+        h_last = home.lower().split()[-1]
+        a_last = away.lower().split()[-1]
+        match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
 
-        # 2. Пытаемся найти в Live Tennis
-        h_parts = home.lower().split()
-        a_parts = away.lower().split()
-        if h_parts and a_parts:
-            h_last = h_parts[-1]
-            a_last = a_parts[-1]
-            match_time = lt_times.get(f"{h_last}_{a_last}") or lt_times.get(f"{a_last}_{h_last}")
-
-        # 3. Если нет в Live Tennis, берем из Pinnapi (поле 'starts')
         if not match_time:
             start_ts = ev.get("start") or ev.get("starts")
             if start_ts:
                 try:
                     match_time = datetime.fromisoformat(str(start_ts).split(".")[0].replace("Z", "")).replace(tzinfo=timezone.utc)
-                except: 
-                    pass
-
-        if not match_time:
-            continue
+                except: pass
+        if not match_time: continue
 
         time_left = (match_time - now_utc).total_seconds() / 60.0
         match_id = ev.get("event_id") or ev.get("id")
 
-        # ЖЕСТКОЕ ОКНО 15 МИНУТ
         if 0 < time_left <= 15 and match_id not in sent_set:
-            periods = ev.get("periods", {})
-            main = periods.get("num_0", {})
-            ml = main.get("money_line", {})
-            
+            ml = (ev.get("periods", {}).get("num_0", {}).get("money_line", {}))
             if not ml or not ml.get("home"): continue
-            o_h, o_a = ml.get("home"), ml.get("away")
             
             msg = f"🚨 <b>Матч через {int(time_left)} мин!</b> 🚨\n"
             msg += f"🏆 <b>{home}</b> — <b>{away}</b>\n\n"
-            msg += f"<b>Исход:</b> {o_h:.2f} / {o_a:.2f}\n"
+            msg += f"<b>Исход:</b> {ml.get('home'):.2f} / {ml.get('away'):.2f}\n"
             
-            totals = main.get("totals", {})
-            if totals:
-                best_line = list(totals.keys())[0]
-                t_data = totals[best_line]
-                msg += f"<b>Тотал (сет):</b>\nТМ({best_line}): {t_data.get('under', 0):.2f} | ТБ({best_line}): {t_data.get('over', 0):.2f}\n"
+            # Отправляем КАЖДОМУ пользователю в его группу
+            for user in users:
+                try:
+                    bot.send_message(user["chat_id"], msg, parse_mode="HTML", message_thread_id=user["thread_notif"])
+                except Exception as e:
+                    print(f"Ошибка отправки {user['user_id']}: {e}")
             
-            spreads = main.get("spreads", {})
-            if spreads:
-                best_line = list(spreads.keys())[0]
-                s_data = spreads[best_line]
-                msg += f"<b>Фора (сет):</b>\nФ1({s_data.get('hdp')}): {s_data.get('home', 0):.2f} | Ф2({-float(s_data.get('hdp'))}): {s_data.get('away', 0):.2f}\n"
-            
-            msg += f"\n👉 <i>Ответь на это сообщение, чтобы сохранить ставку!</i>"
-            
-            try:
-                t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-                bot.send_message(GROUP_CHAT_ID, msg, parse_mode="HTML", message_thread_id=t_id)
-                print(f"✅ ОТПРАВЛЕНО: {home} - {away}")
-                sent_set.add(match_id)
-                save_sent(sent_set)
-            except Exception as e:
-                print(f"❌ ОШИБКА ОТПРАВКИ: {e}")
+            sent_set.add(match_id)
+            save_sent(sent_set)
+            print(f"✅ Отправлено всем: {home} - {away}")
 
 def background_worker():
     while True:
         now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
-        if 8 <= now_msk.hour < 24: # Работаем днем
+        if 8 <= now_msk.hour < 24:
             check_upcoming_matches()
-        time.sleep(600) # Спим 10 минут
+        time.sleep(600)
 
 # ==========================================
-# ОБРАБОТКА ОТВЕТОВ (СОЗДАНИЕ СТАВКИ)
+# ОБРАБОТКА СТАВОК (ОТВЕТЫ)
 # ==========================================
-@bot.message_handler(func=lambda message: message.reply_to_message is not None and str(message.chat.id) == str(GROUP_CHAT_ID))
+@bot.message_handler(func=lambda message: message.reply_to_message is not None and message.text and not message.text.startswith('/'))
 def handle_bet_reply(message):
-    # Если это команда (начинается с /), игнорируем её, чтобы не сломать бота
-    if message.text and message.text.startswith('/'):
-        return
-        
     original_msg = message.reply_to_message.text
     if not original_msg or "Матч через" not in original_msg:
         return
@@ -235,12 +204,6 @@ def handle_bet_reply(message):
     try:
         ml_str = original_msg.split("Исход:")[1].split("\n")[0].strip()
         pin_ml = [float(x.strip()) for x in ml_str.split("/")]
-        tot_str = original_msg.split("ТМ(")[1].split("\n")[0]
-        pin_tm = float(tot_str.split("): ")[1].split(" |")[0])
-        pin_tb = float(tot_str.split("ТБ(")[1].split("): ")[1])
-        sp_str = original_msg.split("Ф1(")[1].split("\n")[0]
-        pin_f1 = float(sp_str.split("): ")[1].split(" |")[0])
-        pin_f2 = float(sp_str.split("Ф2(")[1].split("): ")[1])
     except:
         bot.reply_to(message, "❌ Не смог прочитать кэфы Pinnacle из сообщения.")
         return
@@ -249,34 +212,33 @@ def handle_bet_reply(message):
     i = 0
     while i < len(user_text):
         market = user_text[i]
-        if market in ["ТБ", "ТМ", "П1", "П2", "Ф1", "Ф2"] and i + 1 < len(user_text):
+        if market in ["П1", "П2"] and i + 1 < len(user_text):
             try:
                 user_odd = float(user_text[i+1].replace(",", "."))
-                pin_odd = None
-                if market == "ТБ": pin_odd = pin_tb
-                elif market == "ТМ": pin_odd = pin_tm
-                elif market == "П1": pin_odd = pin_ml[0]
-                elif market == "П2": pin_odd = pin_ml[1]
-                elif market == "Ф1": pin_odd = pin_f1
-                elif market == "Ф2": pin_odd = pin_f2
-                
-                if pin_odd:
-                    clv = (user_odd / pin_odd) - 1
-                    bets_to_save.append((market, user_odd, pin_odd, clv))
+                pin_odd = pin_ml[0] if market == "П1" else pin_ml[1]
+                clv = (user_odd / pin_odd) - 1
+                bets_to_save.append((market, user_odd, pin_odd, clv))
             except: pass
             i += 2
         else: i += 1
 
     if not bets_to_save:
-        bot.reply_to(message, "❌ Не распознал ставки. Пиши строго: ТБ 2.7, Ф1 2.5")
+        bot.reply_to(message, "❌ Не распознал ставки. Пиши строго: П1 1.85 или П2 2.10")
         return
 
     match_name = original_msg.split("\n")[1].replace("<b>", "").replace("</b>", "")
     
+    # Узнаем, в какую тему отправлять карточку
+    settings = supabase_request("GET", f"user_settings?user_id=eq.{message.from_user.id}", None)
+    if not settings or isinstance(settings, dict):
+        bot.reply_to(message, "❌ Сначала настрой группу командой /setup")
+        return
+    t_bets = settings[0]["thread_bets"]
+
     for market, u_odd, p_odd, clv in bets_to_save:
         data = {
             "chat_id": message.chat.id, 
-            "user_id": message.from_user.id, # СОХРАНЯЕМ ТВОЙ ID
+            "user_id": message.from_user.id,
             "username": message.from_user.username or message.from_user.first_name,
             "match_name": match_name, 
             "market": market, 
@@ -295,140 +257,74 @@ def handle_bet_reply(message):
                 types.InlineKeyboardButton("❌ Проиграл", callback_data=f"lose_{bet_id}"), 
                 types.InlineKeyboardButton("🔄 Возврат", callback_data=f"void_{bet_id}")
             )
-            b_id = THREAD_ID_MY_BETS if THREAD_ID_MY_BETS > 1 else None
-            bot.send_message(GROUP_CHAT_ID, card_text, reply_markup=markup, parse_mode="HTML", message_thread_id=b_id)
+            bot.send_message(message.chat.id, card_text, reply_markup=markup, parse_mode="HTML", message_thread_id=t_bets)
     
     bot.reply_to(message, "✅ Ставки сохранены!")
 
 # ==========================================
-# ОБРАБОТКА КНОПОК
+# КНОПКИ И СТАТИСТИКА
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
     action, bet_id = call.data.split("_")
-    status_map = {"win": "won", "lose": "lost", "void": "void"}
-    status_ru = {"won": "✅ Выигрыш", "lost": "❌ Проигрыш", "void": "🔄 Возврат"}
-    new_status = status_map[action]
+    res = supabase_request("GET", f"telegram_bets?id=eq.{bet_id}", None)
+    if not res: return
     
+    if str(call.from_user.id) != str(res[0]["user_id"]):
+        bot.answer_callback_query(call.id, "⛔ Это не твоя ставка!", show_alert=True)
+        return
+        
+    new_status = {"win": "won", "lose": "lost", "void": "void"}[action]
     supabase_request("PATCH", f"telegram_bets?id=eq.{bet_id}", {"status": new_status})
     
-    new_text = call.message.text + f"\n\n<b>Статус: {status_ru[new_status]}</b>"
-    bot.edit_message_text(new_text, call.message.chat.id, call.message.message_id, parse_mode="HTML")
+    status_ru = {"won": "✅ Выигрыш", "lost": "❌ Проигрыш", "void": "🔄 Возврат"}
+    bot.edit_message_text(call.message.text + f"\n\n<b>Статус: {status_ru[new_status]}</b>", call.message.chat.id, call.message.message_id, parse_mode="HTML")
     bot.answer_callback_query(call.id, "Ставка закрыта!")
-
-# ==========================================
-# СТАТИСТИКА
-# ==========================================
-@bot.message_handler(commands=['test']) #тест команд
-def test_cmd(message):
-    bot.reply_to(message, "✅ Я работаю и слышу тебя!")
-
 
 @bot.message_handler(commands=['stats'])
 def show_stats(message):
-    print(f"📊 ПРИШЛА КОМАНДА /stats ОТ {message.from_user.first_name}")
-    try:
-        user_id = message.from_user.id
+    user_id = message.from_user.id
+    settings = supabase_request("GET", f"user_settings?user_id=eq.{user_id}", None)
+    t_stats = settings[0]["thread_stats"] if settings and not isinstance(settings, dict) else None
+
+    res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
+    if not res or isinstance(res, dict):
+        bot.send_message(message.chat.id, "📊 У тебя пока нет ставок.", message_thread_id=t_stats)
+        return
         
-        # Ищем в базе ТОЛЬКО твои ставки (по твоему user_id)
-        res = supabase_request("GET", f"telegram_bets?user_id=eq.{user_id}&status=neq.open", None)
-        
-        # Если база вернула ошибку
-        if isinstance(res, dict) and "message" in res:
-            bot.reply_to(message, f"❌ Ошибка БД: {res['message']}")
-            return
-            
-        # Если ставок нет
-        if not res or len(res) == 0:
-            s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
-            bot.send_message(
-                GROUP_CHAT_ID, 
-                f"📊 <b>{message.from_user.first_name}</b>, у тебя пока нет закрытых ставок.", 
-                parse_mode="HTML",
-                message_thread_id=s_id
-            )
-            return
-            
-        # Считаем статистику
-        total = len(res)
-        won = sum(1 for r in res if r["status"] == "won")
-        lost = sum(1 for r in res if r["status"] == "lost")
-        void = sum(1 for r in res if r["status"] == "void")
-        avg_clv = sum(r["clv"] for r in res) / total if total > 0 else 0
-        profit = (won * 1.0) - (lost * 1.0)
-        
-        text = f"📊 <b>Статистика: {message.from_user.first_name}</b>\n\n<pre>"
-        text += f"Всего ставок:  {total}\n✅ Побед:       {won}\n❌ Поражений:   {lost}\n🔄 Возвратов:   {void}\n------------------------\n📈 Средний CLV: {avg_clv:+.2%}\n💰 Профит (ед.): {profit:+.1f}</pre>"
-        
-        s_id = THREAD_ID_STATS if THREAD_ID_STATS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, text, parse_mode="HTML", message_thread_id=s_id)
-        
-    except Exception as e:
-        bot.reply_to(message, f"❌ Системная ошибка: {e}")
+    total = len(res)
+    won = sum(1 for r in res if r["status"] == "won")
+    lost = sum(1 for r in res if r["status"] == "lost")
+    profit = won - lost
+    avg_clv = sum(r["clv"] for r in res) / total
+    
+    text = f"📊 <b>Твоя статистика</b>\n\n<pre>Всего: {total}\n✅ Побед: {won}\n❌ Поражений: {lost}\n📈 CLV: {avg_clv:+.2%}\n💰 Профит: {profit:+.1f}</pre>"
+    bot.send_message(message.chat.id, text, parse_mode="HTML", message_thread_id=t_stats)
 
 # ==========================================
 # ЗАПУСК
 # ==========================================
-@bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    print(f"🚨 ПОЙМАНО СООБЩЕНИЕ: {message.text} | Chat ID: {message.chat.id} | Thread: {message.message_thread_id}")
-
-
 if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    print("📤 Отправляю тест...")
-    try:
-        t_id = THREAD_ID_NOTIFICATIONS if THREAD_ID_NOTIFICATIONS > 1 else None
-        bot.send_message(GROUP_CHAT_ID, "🛠️ <b>Бот перезапущен и полностью готов к работе!</b>", parse_mode="HTML", message_thread_id=t_id)
-    except Exception as e:
-        print(f"❌ ОШИБКА ТЕСТА: {e}")
-
-    try:
-        bot.remove_webhook()
-    except: pass
-
     threading.Thread(target=background_worker, daemon=True).start()
-    
-    print("🔄 Запускаю РУЧНОЙ цикл...")
     
     last_update_id = None
     while True:
         try:
             updates = bot.get_updates(offset=last_update_id, timeout=20, limit=10)
-            
             if updates:
                 for update in updates:
                     last_update_id = update.update_id + 1
-                    
-                    # 1. ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
                     if update.message:
-                        msg = update.message
-                        print(f"🚨 СООБЩЕНИЕ: {msg.text}")
-                        
                         try:
-                            if msg.text == '/test':
-                                bot.reply_to(msg, "✅ Бот работает!")
-                            elif msg.text == '/stats':
-                                show_stats(msg)
-                            elif msg.reply_to_message:
-                                handle_bet_reply(msg)
-                        except Exception as e:
-                            print(f"❌ ОШИБКА ФУНКЦИИ: {e}")
-                            bot.reply_to(msg, f"❌ Ошибка в коде: {e}")
-                            
-                    # 2. ОБРАБОТКА НАЖАТИЙ НА КНОПКИ (Выиграл/Проиграл)
+                            if update.message.text == '/setup':
+                                setup_group(update.message)
+                            elif update.message.text == '/stats':
+                                show_stats(update.message)
+                            elif update.message.reply_to_message:
+                                handle_bet_reply(update.message)
+                        except Exception as e: print(f"Err: {e}")
                     elif update.callback_query:
-                        call = update.callback_query
-                        print(f"🚨 НАЖАТА КНОПКА: {call.data}")
-                        
-                        try:
-                            handle_callback(call) # Вызываем функцию из твоего кода
-                        except Exception as e:
-                            print(f"❌ ОШИБКА КНОПКИ: {e}")
-                            bot.answer_callback_query(call.id, f"Ошибка: {e}")
-                            
+                        try: handle_callback(update.callback_query)
+                        except Exception as e: print(f"Btn Err: {e}")
         except Exception as e:
-            print(f"❌ ОШИБКА В ЦИКЛЕ: {e}")
             time.sleep(5)
