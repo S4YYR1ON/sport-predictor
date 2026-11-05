@@ -93,6 +93,24 @@ def setup_group(message):
         bot.send_message(chat_id, "✅ <b>Группа успешно настроена!</b>\nВсе темы созданы.", parse_mode="HTML", message_thread_id=t_notif)
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
+    # ... код создания тем (t_notif, t_bets, t_stats) ...
+
+    # 1. Меняем название группы
+    try:
+        new_title = f"SportPredictorGroup | {message.from_user.first_name}"
+        bot.set_chat_title(chat_id, new_title)
+    except Exception as e:
+        print(f"Не смог изменить название: {e}")
+
+    # 2. Ставим аватарку группе (нужна прямая ссылка на картинку .jpg/.png)
+    try:
+        image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg" 
+        img_data = requests.get(image_url).content
+        bot.set_chat_photo(chat_id, photo=img_data)
+    except Exception as e:
+        print(f"Не смог изменить аватарку: {e}")
+
+    # ... сохранение в базу ...
 
 # ==========================================
 # УВЕДОМЛЕНИЯ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
