@@ -67,19 +67,50 @@ def setup_group(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
-    bot.reply_to(message, "⏳ Настраиваю группу. Это займет 5 секунд (создаю темы)...")
+    bot.reply_to(message, "⏳ Настраиваю группу (темы, название, аватарка). Это займет около 10 секунд...")
 
     try:
-        # Создаем темы с паузами, чтобы Telegram не выдавал ошибку
-        t_notif = bot.create_forum_topic(chat_id, "🔔 Уведомления").message_thread_id
-        time.sleep(2) # Пауза 2 секунды
+        # 1. Создаем темы
+        topic_notif = bot.create_forum_topic(chat_id, "🔔 Уведомления")
+        t_notif = topic_notif.message_thread_id
+        time.sleep(2)
         
-        t_bets = bot.create_forum_topic(chat_id, "📝 Мои ставки").message_thread_id
-        time.sleep(2) # Пауза 2 секунды
+        topic_bets = bot.create_forum_topic(chat_id, "📝 Мои ставки")
+        t_bets = topic_bets.message_thread_id
+        time.sleep(2)
         
-        t_stats = bot.create_forum_topic(chat_id, "📊 Статистика").message_thread_id
+        topic_stats = bot.create_forum_topic(chat_id, "📊 Статистика")
+        t_stats = topic_stats.message_thread_id
 
-        # Сохраняем в базу
+        # 2. Включаем уведомления для тем
+        for t_id in [t_notif, t_bets, t_stats]:
+            try:
+                bot.set_forum_topic_notification_settings(chat_id, t_id, notification_settings={})
+            except Exception as e:
+                print(f"⚠️ Ошибка включения уведомлений для темы {t_id}: {e}")
+
+        # 3. Меняем название группы
+        try:
+            new_title = f"SportPredictorGroup"
+            bot.set_chat_title(chat_id, new_title)
+        except Exception as e:
+            print(f"⚠️ Не смог изменить название: {e}")
+
+        # 4. Ставим аватарку (используем ссылку, которую ты присылал)
+        try:
+            image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            img_data = requests.get(image_url, headers=headers, timeout=10).content
+            
+            if len(img_data) > 1000:
+                bot.set_chat_photo(chat_id, photo=img_data)
+                print("✅ Аватарка успешно изменена!")
+            else:
+                print("❌ Ошибка: Скачанный файл слишком маленький.")
+        except Exception as e:
+            print(f"⚠️ Не смог изменить аватарку: {e}")
+
+        # 5. Сохраняем в базу
         supabase_request("DELETE", f"user_settings?user_id=eq.{user_id}")
         data = {
             "user_id": user_id,
@@ -90,35 +121,15 @@ def setup_group(message):
         }
         supabase_request("POST", "user_settings", data)
         
-        bot.send_message(chat_id, "✅ <b>Группа успешно настроена!</b>\nВсе темы созданы.", parse_mode="HTML", message_thread_id=t_notif)
+        bot.send_message(
+            chat_id, 
+            "✅ <b>Группа успешно настроена!</b>\nВсе темы созданы, уведомления включены, профиль обновлен.", 
+            parse_mode="HTML", 
+            message_thread_id=t_notif
+        )
+        
     except Exception as e:
-        bot.reply_to(message, f"❌ Ошибка: {e}")
-    # ... код создания тем (t_notif, t_bets, t_stats) ...
-
-    # 1. Меняем название группы
-    try:
-        new_title = f"SportPredictorGroup"
-        bot.set_chat_title(chat_id, new_title)
-    except Exception as e:
-        print(f"Не смог изменить название: {e}")
-
-    # 2. Ставим аватарку группе
-    try:
-        image_url = "https://www.sostav.ru/blogs/images/feeds/123/245355.jpg"
-            
-        # Притворяемся браузером, чтобы сайт не блокировал скачивание
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        img_data = requests.get(image_url, headers=headers, timeout=10).content
-            
-        # Проверяем, что скачалось хоть что-то (а не пустая страница с ошибкой)
-        if len(img_data) > 1000:
-            bot.set_chat_photo(chat_id, photo=img_data)
-            print("✅ Аватарка успешно изменена!")
-        else:
-            print("❌ Ошибка: Скачанный файл слишком маленький (возможно, сайт заблокировал).")
-                
-    except Exception as e:
-        print(f"❌ Не смог изменить аватарку: {e}")
+        bot.reply_to(message, f"❌ Ошибка при настройке: {e}")
 # ==========================================
 # УВЕДОМЛЕНИЯ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
 # ==========================================
