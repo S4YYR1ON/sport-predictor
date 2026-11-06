@@ -323,7 +323,7 @@ def show_stats(message):
         
         # Формируем сообщение с добавленной строкой возвратов
         text = f"📊 <b>Твоя статистика</b>\n\n<pre>"
-        text += f"Всего:       {total}\n"
+        text += f"Всего:        {total}\n"
         text += f"✅ Побед:     {won}\n"
         text += f"❌ Поражений: {lost}\n"
         text += f"🔄 Возвратов: {void}\n"
